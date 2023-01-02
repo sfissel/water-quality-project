@@ -1,0 +1,271 @@
+---
+title: "Water Quality Presentation 1"
+author: "Group 3: Stephanie Fissel, Beza Gashe, Claire Yoon"
+date: "January 3, 2023"
+output: 
+  html_document:
+    theme: lumen
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 3
+editor_options: 
+chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(plotly)
+library(shiny)
+library(shinyWidgets)
+library(tidyverse)
+library(aod)
+library(vtable)
+```
+
+# Problem
+...
+
+# Background
+...
+
+# Question
+...
+
+# Data Source
+
+### ***[Water Quality](https://www.kaggle.com/datasets/adityakadiwal/water-potability?select=water_potability.csv)***
+A dataset containing water quality metrics for 3276 different water bodies. <br/>
+Key metrics include: <br/>
+    
+* pH value
+    + indicator of acidic or alkaline condition of water status
+* Hardness
+    + caused by calcium and magnesium salts
+* Solids (Total dissolved solids - TDS)
+   + indicator of level of mineralization of water
+* Chloramines
+   + level of disinfectant in water
+* Sulfates
+   + naturally occurring substance present in minerals, soil, and rocks
+* Conductivity
+   + Item 2a
+* Organic carbon
+   + measure of the total amount of carbon in organic compounds in pure water
+* Trihalomethanes
+   + chemicals found in water treated with chlorine
+* Turbidity
+   + depends on quantity of solid matter pressent in suspended state
+
+Target metric: <br/>
+
+* Potability
+   + indicator of whether water is safe for human consumption where 1=Potable 
+   and 0=Not Potable
+
+
+#### Read in the data
+```{r}
+water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+
+head(water_quality)
+```
+
+### Clean the data
+#### Eliminate the "Sulfate" column: 
+more info why...
+
+```{r}
+water_quality <- subset(water_quality, select = -c(Sulfate))
+head(water_quality)
+```
+#### Remove rows containing at least one NA
+```{r}
+water_quality <- na.omit(water_quality)
+```
+#### Converting 'Potability' to a factor (categorical variable)
+```{r}
+water_quality$Potability <- factor(water_quality$Potability)
+head(water_quality)
+```
+
+# Descriptive Statistics {.tabset}
+## **SUMMARY STATS** {.tabset}
+
+```{r}
+st(water_quality)
+```
+
+
+
+
+## **DISTRIBUTIONS** {.tabset .tabset-fade .tabset-pills}
+
+### pH
+```{r}
+# Histogram
+hist(water_quality$ph, prob = TRUE,
+     col = "white",
+     main = "pH Level Distribution",
+     xlab = "pH Level",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$ph, horizontal = TRUE, axes = FALSE,
+        col = rgb(1, 0, 0, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Hardness
+```{r}
+# Histogram
+hist(water_quality$Hardness, prob = TRUE,
+     col = "white",
+     main = "Hardness Level Distribution",
+     xlab = "Hardness Level",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Hardness, horizontal = TRUE, axes = FALSE,
+        col = rgb(1, 0.4, 0, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Solids
+```{r}
+# Histogram
+hist(water_quality$Solids, prob = TRUE,
+     col = "white",
+     main = "Solids Level Distribution",
+     xlab = "Solids Level",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Solids, horizontal = TRUE, axes = FALSE,
+        col = rgb(1, 1, 0, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Chloramines
+```{r}
+# Histogram
+hist(water_quality$Chloramines, prob = TRUE,
+     col = "white",
+     main = "Chloramines Level Distribution",
+     xlab = "Chloramines Level",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Chloramines, horizontal = TRUE, axes = FALSE,
+        col = rgb(0, 0.4, 0, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Conductivity
+```{r}
+# Histogram
+hist(water_quality$Conductivity, prob = TRUE,
+     col = "white",
+     main = "Conductivity Level Distribution",
+     xlab = "Conductivity Level",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Conductivity, horizontal = TRUE, axes = FALSE,
+        col = rgb(0, 0.6, 1, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Organic Carbon
+```{r}
+# Histogram
+hist(water_quality$Organic_carbon, prob = TRUE,
+     col = "white",
+     main = "Organic_carbon Level Distribution",
+     xlab = "Organic_carbon Level",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Organic_carbon, horizontal = TRUE, axes = FALSE,
+        col = rgb(0, 0.2, 1, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Trihalomethanes
+```{r}
+# Histogram
+hist(water_quality$Trihalomethanes, prob = TRUE,
+     col = "white",
+     main = "Trihalomethanes Level Distribution",
+     xlab = "Trihalomethanes Level",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Trihalomethanes, horizontal = TRUE, axes = FALSE,
+        col = rgb(0.6, 0, 1, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Turbidity
+```{r}
+# Histogram
+hist(water_quality$Turbidity, prob = TRUE,
+     col = "white",
+     main = "Turbidity Level Distribution",
+     xlab = "Turbidity Level",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Turbidity, horizontal = TRUE, axes = FALSE,
+        col = rgb(1, 0.2, 0.8, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+
+
+
+
+
