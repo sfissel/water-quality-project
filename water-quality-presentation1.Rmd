@@ -1,0 +1,326 @@
+---
+title: "Water Quality Presentation 1"
+author: "Group 3: Stephanie Fissel, Beza Gashe, Claire Yoon"
+date: "January 3, 2023"
+output: 
+  html_document:
+    theme: lumen
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 3
+editor_options: 
+chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(plotly)
+library(shiny)
+library(shinyWidgets)
+library(tidyverse)
+library(aod)
+library(vtable)
+library(scales)
+```
+
+# Problem
+Access to safe drinking water is essential to health and a basic human right, 
+though many developing countries and even parts of the U.S. like Flint, Michigan are living with 
+contaminated drinking water. With the increased prevalence of climate change, 
+drinking water is becoming even more negatively impacted by contaminants. In 
+these instances, non-potable drinking water containing unsafe levels of 
+contaminants can have serious adverse health effects, such as gastrointestinal 
+illnesses, cancer, and transmissible diseases. 
+
+# Question
+There are various water quality metrics that may contribute to the potability of
+drinking water. We want to analyze and determine what metrics may more heavily 
+contribute to water being non-potable which could, in the real world, help 
+formulate effective policy for health protection through implementation of 
+systems that specifically de-contaminate the water of these substances. In some 
+regions, it has been shown that investments in water supply and sanitation can yield a new 
+economic benefit, since the reductions in adverse health effects and health care 
+costs outweigh the costs of undertaking the interventions. Continuing with this 
+idea, we can then answer the question, "How well can a Machine Learning model 
+accurately predict the non-potability of water?"
+
+# Data Source
+
+### ***[Water Quality](https://www.kaggle.com/datasets/adityakadiwal/water-potability?select=water_potability.csv)***
+A dataset containing water quality metrics for 3276 different water bodies. <br/>
+Key metrics include: <br/>
+    
+* pH value
+    + acidic or alkaline condition
+* Hardness
+    + caused by calcium and magnesium salts
+* Solids (Total dissolved solids - TDS)
+   + mineralization of organic minerals or salts
+* Chloramines
+   + disinfectant (chlorine + ammonia = chloramines)
+* Sulfates
+   + naturally occurring substance present in minerals, soil, and rocks
+* Conductivity
+   + determined by amount of dissolved solids
+* Organic carbon
+   + carbon in decaying natural organic matter and synthetic sources
+* Trihalomethanes
+   + chemicals found in water treated with chlorine
+* Turbidity
+   + depends on quantity of solid matter present; measure of light emitting 
+   properties of water
+
+Target metric: <br/>
+
+* Potability
+   + indicator of whether water is safe for human consumption where 1 = Potable 
+   and 0 = Not Potable
+
+
+#### Read in the data
+```{r}
+water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+
+head(water_quality)
+```
+
+### Clean the data
+```
+#### Remove rows containing at least one NA
+```{r}
+water_quality <- na.omit(water_quality)
+```
+#### Converting 'Potability' to a factor (categorical variable)
+```{r}
+water_quality$Potability <- factor(water_quality$Potability)
+```
+
+# Descriptive Statistics {.tabset}
+## **SUMMARY STATS** {.tabset}
+
+```{r}
+st(water_quality)
+```
+
+## **POTABLE VS. NON-POTABLE** {.tabset}
+```{r}
+# non-potable
+# colSums(water_quality==0) #--> 1998
+# potable
+# colSums(water_quality==1) #--> 1278
+np <- round(1998/3276 * 100)
+p <- round(1278/3276 * 100)
+# Subset test data
+data <- data.frame(
+  category=c("Non-Potable", "Potable"),
+  count=c(np, p)
+)
+
+# Compute percentages
+data$fraction = data$count / sum(data$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+data$ymax = cumsum(data$fraction)
+
+# Compute the bottom of each rectangle
+data$ymin = c(0, head(data$ymax, n=-1))
+
+# Compute label position
+data$labelPosition <- (data$ymax + data$ymin) / 2
+
+# Compute a good label
+data$label <- paste0(data$category, ": ", data$count, "%")
+
+# Make the plot
+ggplot(data, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=category)) +
+  geom_rect() +
+  geom_label( x=3.5, aes(y=labelPosition, label=label), size=3) +
+  scale_fill_brewer(palette=1) +
+  coord_polar(theta="y") +
+  xlim(c(2, 4)) +
+  theme_void() +
+  theme(legend.position = "none")
+```
+
+## **DISTRIBUTIONS** {.tabset .tabset-fade .tabset-pills}
+
+### pH
+**Recommended Level:** 6.5-8.5 pH (neutral on pH scale)
+```{r}
+# Histogram
+hist(water_quality$ph, prob = TRUE,
+     col = "white",
+     main = "pH Level Distribution",
+     xlab = "pH Level (pH)",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$ph, horizontal = TRUE, axes = FALSE,
+        col = rgb(1, 0, 0, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Hardness
+**Recommended Level:** None <br/>
+Hardness levels > 150 mg/L are considered hard water. If water is hard, it can 
+reduce efficiency of water 
+treatment.
+```{r}
+# Histogram
+hist(water_quality$Hardness, prob = TRUE,
+     col = "white",
+     main = "Hardness Level Distribution",
+     xlab = "Hardness Level (mg/L)",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Hardness, horizontal = TRUE, axes = FALSE,
+        col = rgb(1, 0.4, 0, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Solids
+**Recommended Level:** 500-1000 mg/l
+```{r}
+# Histogram
+hist(water_quality$Solids, prob = TRUE,
+     col = "white",
+     main = "Solids Level Distribution",
+     xlab = "Solids Level (mg/l)",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Solids, horizontal = TRUE, axes = FALSE,
+        col = rgb(1, 1, 0, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Chloramines
+**Recommended Level:** 4 mg/L or less
+```{r}
+# Histogram
+hist(water_quality$Chloramines, prob = TRUE,
+     col = "white",
+     main = "Chloramines Level Distribution",
+     xlab = "Chloramines Level (mg/L)",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Chloramines, horizontal = TRUE, axes = FALSE,
+        col = rgb(0, 0.4, 0, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Conductivity
+**Recommended Level:** 400 μS/cm or less
+```{r}
+# Histogram
+hist(water_quality$Conductivity, prob = TRUE,
+     col = "white",
+     main = "Conductivity Level Distribution",
+     xlab = "Conductivity Level (μS/cm)",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Conductivity, horizontal = TRUE, axes = FALSE,
+        col = rgb(0, 0.6, 1, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Organic Carbon
+**Recommended Level:** 2 mg/L or less
+```{r}
+# Histogram
+hist(water_quality$Organic_carbon, prob = TRUE,
+     col = "white",
+     main = "Organic Carbon Level Distribution",
+     xlab = "Organic Carbon Level (mg/L)",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Organic_carbon, horizontal = TRUE, axes = FALSE,
+        col = rgb(0, 0.2, 1, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Trihalomethanes
+**Recommended Level:** 80 ppm or less
+```{r}
+# Histogram
+hist(water_quality$Trihalomethanes, prob = TRUE,
+     col = "white",
+     main = "Trihalomethanes Level Distribution",
+     xlab = "Trihalomethanes Level (ppm)",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Trihalomethanes, horizontal = TRUE, axes = FALSE,
+        col = rgb(0.6, 0, 1, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+### Turbidity
+**Recommended Level:** 5 NTU or less
+```{r}
+# Histogram
+hist(water_quality$Turbidity, prob = TRUE,
+     col = "white",
+     main = "Turbidity Level Distribution",
+     xlab = "Turbidity Level (NTU)",
+     ylab = "Count")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(water_quality$Turbidity, horizontal = TRUE, axes = FALSE,
+        col = rgb(1, 0.2, 0.8, alpha = 0.5))
+
+# Box around the plots
+box()
+```
+
+
+
+
+
+
