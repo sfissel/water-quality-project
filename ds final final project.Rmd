@@ -1,0 +1,248 @@
+---
+title: "ds project"
+author: "Beza Gashe"
+date: "2023-01-03"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(e1071)
+library(tidyverse)
+library(plotly)
+library(htmltools)
+install.packages("devtools")
+library(devtools)
+install.packages("caret")
+library(caret)
+install.packages("NbClust")
+library(NbClust)
+install.packages("randomForest")
+library(randomForest)
+library(rio)
+library(tidyverse)
+#rm(list=ls())
+```
+
+#Instructions: Your goal is to build a Random Forest Classifier to be able to predict income levels above or below 50k and then compare the results to the decision tree classification we did a couple of weeks ago.
+
+#Load the Data
+```{r}
+getwd()
+read.csv("water_potability.csv")
+water_quality <- read.csv("water_potability.csv")
+head(water_quality)
+str(water_quality)
+
+```
+
+
+#Finish any other data prep (one-hot encode, reduce factor levels)
+```{r}
+dim(water_quality) #10 columns, 3276 rows
+sum(is.na(water_quality)) #1434 missing values
+colSums(is.na(water_quality))#?colSums
+#missing values found in ph, sulfate, and trihalomethanes
+
+
+#Delete missing values
+water_quality <- water_quality[complete.cases(water_quality),]
+sum(is.na(water_quality))
+str(water_quality)
+head(water_quality)
+
+#converting target variable, potability to a factor:
+water_quality$Potability <- factor(water_quality$Potability)
+str(water_quality)
+```
+
+#No need to standardize the data
+
+#prevalence
+```{r}
+water_quality1<-names(select_if(water_quality, is.factor))
+water_quality1
+str(water_quality)
+table(water_quality$Potability)[2]/sum(table(water_quality$Potability))
+#prevalence=0.40
+
+water_quality$Potability <- recode(water_quality$Potability, 
+                           '0' = 'Non_Potable', 
+                            '1' = 'Potable')
+```
+
+
+#test, tune and training sets 
+```{r}
+set.seed(1999)
+
+part_index_1 <- caret::createDataPartition(water_quality$Potability,
+                                           times=1,
+                                           p = 0.80,
+                                           groups=1,
+                                           list=FALSE)
+
+train <- water_quality[part_index_1, ]
+tune_and_test <- water_quality[-part_index_1, ]
+train
+
+
+tune_and_test_index <- createDataPartition(water_quality$Potability,
+                                           p = .1,
+                                           list = FALSE,
+                                           times = 1)
+
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+
+
+dim(train)
+#1609  14
+dim(test)
+#367   14
+dim(tune)
+#202  14
+```
+
+
+#Calculate the initial mtry level 
+```{r}
+water_quality_tune <- function(x){
+  water_quality <- dim(x)[2]-1
+  sqrt(water_quality)
+}
+
+water_quality_tune(water_quality)
+# = 3
+```
+
+#Run the initial RF model with 1000 trees
+```{r}
+water_quality_RF = randomForest(as.factor(Potability)~.,          
+                            train,     
+                            ntree = 1000,  
+                            mtry = 3, 
+                            replace = TRUE,      
+                            sampsize = 100,      
+                            nodesize = 5,        
+                            
+                            importance = TRUE,   
+                           
+                            proximity = FALSE, 
+                            norm.votes = TRUE,
+                            do.trace = TRUE,     
+                            keep.forest = TRUE, 
+                            keep.inbag = TRUE)  
+view(water_quality_RF)
+```
+
+
+#Take a look at the variable importance measures, are they the same as the DT version or not? (note = ignore "previous dt version")
+```{r}
+set.seed(1)
+varImp(water_quality_RF) 
+```
+#Variable Importance; In a model predicting salaries above/below 50k, the metrics with the greatest variable importance are capital gain, education, age, and marital status. The least important variables are race and final weight. 
+
+
+
+#Using the training and tune datasets to tune the model in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output.
+```{r}
+#### Optimize the random forest model ####
+
+set.seed(1984)	
+water_quality_RF_2 = randomForest(as.factor(Potability)~.,          #<- 
+                              train,    
+                              ntree = 1000,     
+                              mtry = 6,          
+                              replace = TRUE,   
+                             
+                              sampsize = 200,    
+                              nodesize = 20, 
+                              importance = TRUE,  
+                              proximity = FALSE, 
+                              norm.votes = TRUE, 
+                              do.trace = TRUE, 
+                              keep.forest = TRUE, 
+                              keep.inbag = TRUE) 
+```
+
+
+#evaluate the model using the test dataset. 
+```{r}
+water_quality_predict = predict(water_quality_RF_2,      #<- a randomForest model
+                            test,      #<- the test data set to use
+                            type = "response",   #<- what results to produce, see the help menu for the options
+                            predict.all = TRUE)
+
+
+
+str(water_quality_predict)
+
+water_quality_RF_2$confusion #On the oob data from the model
+#     below above class.error
+#            Non_Potable Potable class.error
+#Non_Potable         861      99   0.1031250
+#Potable             442     207   0.6810478
+
+water_quality_RF$confusion
+#            Non_Potable Potable class.error
+#Non_Potable         910      50  0.05208333
+#Potable             525     124  0.80893683
+#One change to notice between the two matrices is that the error decreased from 0.1 to 0.05% for non-potability. 
+
+
+library(caret)
+confusionMatrix(as.factor(water_quality_predict$aggregate),as.factor(test$Potability),positive = "Potable", 
+                dnn=c("Prediction", "Actual"), mode = "everything")
+```
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
