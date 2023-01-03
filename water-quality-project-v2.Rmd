@@ -1,0 +1,123 @@
+---
+title: "Water Quality Project"
+author: "Group 3: Stephanie Fissel, Beza Gashe, Claire Yoon"
+date: "January 3, 2023"
+output: 
+  html_document:
+    theme: lumen
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 3
+editor_options: 
+chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(plyr)
+library(plotly)
+library(randomForest)
+library(rio)
+library(caret)
+library(ROCR)
+library(tidyverse)
+library(rpart)
+library(psych)
+library(pROC)
+library(rpart.plot)
+library(rattle)
+library(tidyverse)
+library(class)
+library(plotly)
+library(MLmetrics)
+library(mltools)
+library(data.table)
+library(RColorBrewer)
+```
+
+
+#### Read in the data
+```{r}
+#water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+water_quality <- read.csv("~/Desktop/R/water-quality-project/water_potability.csv")
+
+head(water_quality)
+dim(water_quality)
+```
+
+### Clean the data
+```{r}
+water_quality <- water_quality[complete.cases(water_quality), ]
+dim(water_quality)
+```
+
+### Rename and factorize the 'Potability' variable
+```{r}
+water_quality$Potability <- as.factor(water_quality$Potability)
+water_quality$Potability <- fct_collapse(water_quality$Potability, 
+                           potable = "1",
+                           non_potable = "0")
+```
+
+
+### Splitting the data
+```{r}
+set.seed(777)
+partition <- caret::createDataPartition(water_quality$Potability,
+                                           times=1,
+                                           p = 0.80,
+                                           groups=1,
+                                           list=FALSE)
+train <- water_quality[partition, ]
+tune_and_test <- water_quality[-partition, ]
+train
+
+tune_and_test_index <- createDataPartition(tune_and_test$Potability,
+                                           p = .5,
+                                           list = FALSE,
+                                           times = 1)
+
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+
+dim(train)
+dim(test) 
+dim(tune)
+
+# Build the model
+# Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
+str(water_quality)
+features <- train[,-10] #dropping the target variable
+target <- train$Potability
+str(features)
+
+str(target)
+fitControl <- trainControl(method = "repeatedcv",
+                          number = 10,
+                          repeats = 5,
+                          classProbs = TRUE,
+                          summaryFunction = twoClassSummary) 
+
+tree.grid <- expand.grid(maxdepth=c(1:6))
+
+# Train the model
+set.seed(777)
+water_quality_mdl <- train(x=features,
+                y=target,
+                method="rpart2",
+                trControl=fitControl,
+                tuneGrid=tree.grid,
+                metric="ROC")
+
+plot(water_quality_mdl)
+varImp(water_quality_mdl)
+
+rpart.plot(water_quality_mdl$finalModel, type=5,extra=101)
+
+water_quality_mdl
+```
+
