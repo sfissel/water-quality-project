@@ -64,7 +64,7 @@ water_quality$Potability <- fct_collapse(water_quality$Potability,
 ```
 
 
-### Splitting the data
+### Splitting the data & Creating Decision trees
 ```{r}
 set.seed(777)
 partition <- caret::createDataPartition(water_quality$Potability,
@@ -91,7 +91,7 @@ dim(tune)
 # Build the model
 # Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
 str(water_quality)
-features <- train[,-10] #dropping the target variable
+features <- train[,-10] # dropping the target variable
 target <- train$Potability
 str(features)
 
@@ -104,20 +104,36 @@ fitControl <- trainControl(method = "repeatedcv",
 
 tree.grid <- expand.grid(maxdepth=c(1:6))
 
+# Train the model without setting tree grid
+set.seed(777)
+water_mdl <- train(x=features,
+                y=target,
+                method="rpart2",
+                trControl=fitControl,
+                metric="ROC")
+plot(water_mdl)
+varImp(water_mdl)
+rpart.plot(water_mdl$finalModel, type=5,extra=101)
+water_mdl # maxdepth is 12
+
 # Train the model
 set.seed(777)
-water_quality_mdl <- train(x=features,
+water_quality_mdl2 <- train(x=features,
                 y=target,
                 method="rpart2",
                 trControl=fitControl,
                 tuneGrid=tree.grid,
                 metric="ROC")
 
-plot(water_quality_mdl)
-varImp(water_quality_mdl)
+plot(water_quality_mdl2)
+varImp(water_quality_mdl2)
 
-rpart.plot(water_quality_mdl$finalModel, type=5,extra=101)
+rpart.plot(water_quality_mdl2$finalModel, type=1,extra=101)
 
-water_quality_mdl
+water_quality_mdl2 # maxdepth is 6
+```
+
+```{r}
+
 ```
 
