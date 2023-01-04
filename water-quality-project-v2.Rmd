@@ -75,7 +75,7 @@ partition <- caret::createDataPartition(water_quality$Potability,
                                            list=FALSE)
 train <- water_quality[partition, ]
 tune_and_test <- water_quality[-partition, ]
-train
+#train
 
 tune_and_test_index <- createDataPartition(tune_and_test$Potability,
                                            p = .5,
@@ -85,9 +85,9 @@ tune_and_test_index <- createDataPartition(tune_and_test$Potability,
 tune <- tune_and_test[tune_and_test_index, ]
 test <- tune_and_test[-tune_and_test_index, ]
 
-dim(train)
-dim(test) 
-dim(tune)
+#dim(train)
+#dim(test) 
+#dim(tune)
 
 # Build the model
 # Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
@@ -141,14 +141,15 @@ predictandCM<- function(model,data,modeltype,ref)
 }
 
 predictandCM(water_mdl1, tune, "raw", tune$Potability)
+water_pred_tune = predict(water_mdl1,tune,tune$Potability, type= "prob")
+water_pred_tune_labels = predict(water_mdl1,tune,tune$Potability,type = "raw")
+plot(density(water_pred_tune$non_potable))
 
 predictandCM(water_mdl2, tune, "raw", tune$Potability) 
-
-water_pred_tune = predict(water_mdl1,tune,tune$Potability, type= "prob")
-
-water_pred_tune_labels = predict(water_mdl1,tune,tune$Potability,type = "raw")
-
-View(as_tibble(water_pred_tune_labels))
+water_pred_tune2 = predict(water_mdl2,tune,tune$Potability, type= "prob")
+water_pred_tune_labels2 = predict(water_mdl2,tune,tune$Potability,type = "raw")
+plot(density(water_pred_tune2$non_potable))
+#View(as_tibble(water_pred_tune_labels))
 ```
 
 
@@ -160,11 +161,10 @@ water_eval <- caret::confusionMatrix(water_pred_tune_labels,
                 dnn=c("Prediction", "Actual"),
                 positive="non_potable",
                 mode = "everything")
-water_eval
+#water_eval
 ```
 ```{r}
 # With the percentages you generated in step 10,select several different threshold levels using the threshold function we created and interpret the results. What patterns do you notice, did the evaluation metrics change?
-plot(density(water_pred_tune$non_potable))
 
 adjust_thres <- function(x, y, z) {
   #x=pred_probablities, y=threshold, z=tune_outcome
@@ -172,5 +172,5 @@ adjust_thres <- function(x, y, z) {
   confusionMatrix(thres, z, positive = "non_potable", dnn=c("Prediction", "Actual"), mode = "everything")
 }
 
-adjust_thres(water_pred_tune$non_potable,y=.4,tune$Potability)
+#adjust_thres(water_pred_tune$non_potable,y=.4,tune$Potability)
 ```
