@@ -30,8 +30,6 @@ library(tidyverse)
 #rm(list=ls())
 ```
 
-#Instructions: Your goal is to build a Random Forest Classifier to be able to predict income levels above or below 50k and then compare the results to the decision tree classification we did a couple of weeks ago.
-
 #Load the Data
 ```{r}
 getwd()
@@ -130,7 +128,7 @@ water_quality_RF = randomForest(as.factor(Potability)~.,
                             mtry = 3, 
                             replace = TRUE,      
                             sampsize = 100,      
-                            nodesize = 5,        
+                            nodesize = 4,        
                             
                             importance = TRUE,   
                            
@@ -143,14 +141,12 @@ View(water_quality_RF)
 ```
 
 
-#Take a look at the variable importance measures, are they the same as the DT version or not? (note = ignore "previous dt version")
+#variable importance
 ```{r}
 set.seed(1)
 varImp(water_quality_RF) 
 ```
-#Variable Importance; In a model predicting salaries above/below 50k, the metrics with the greatest variable importance are capital gain, education, age, and marital status. The least important variables are race and final weight. 
-
-
+ 
 
 #Using the training and tune datasets to tune the model in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output.
 ```{r}
@@ -164,7 +160,7 @@ water_quality_RF_2 = randomForest(as.factor(Potability)~.,          #<-
                               replace = TRUE,   
                              
                               sampsize = 200,    
-                              nodesize = 20, 
+                              nodesize = 10, 
                               importance = TRUE,  
                               proximity = FALSE, 
                               norm.votes = TRUE, 
@@ -185,17 +181,15 @@ water_quality_predict = predict(water_quality_RF_2,      #<- a randomForest mode
 
 str(water_quality_predict)
 
-water_quality_RF_2$confusion #On the oob data from the model
-#     below above class.error
+water_quality_RF_2$confusion
 #            Non_Potable Potable class.error
-#Non_Potable         861      99   0.1031250
-#Potable             442     207   0.6810478
+#Non_Potable         887      73  0.07604167
+#Potable             464     185  0.71494607
 
 water_quality_RF$confusion
 #            Non_Potable Potable class.error
 #Non_Potable         910      50  0.05208333
 #Potable             525     124  0.80893683
-#One change to notice between the two matrices is that the error decreased from 0.1 to 0.05% for non-potability. 
 
 
 library(caret)
@@ -210,39 +204,3 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
-
-```
-
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
