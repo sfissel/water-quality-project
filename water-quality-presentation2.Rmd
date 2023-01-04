@@ -61,13 +61,13 @@ library(RColorBrewer)
     in drinking water that is claimed to be "potable" though they can have
     adverse effects
     
-
 # Random Forest Classifier
 
 ### Load the Data
 ```{r}
 getwd()
-water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+#water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+water_quality <- read.csv("~/Desktop/R/water-quality-project/water_potability.csv")
 ```
 
 
@@ -80,10 +80,10 @@ colSums(is.na(water_quality))#?colSums
 #Delete missing values
 water_quality <- water_quality[complete.cases(water_quality),]
 sum(is.na(water_quality))
-str(water_quality)
+#str(water_quality)
 #converting target variable, potability to a factor:
 water_quality$Potability <- factor(water_quality$Potability)
-str(water_quality)
+#str(water_quality)
 ```
 
 No need to standardize the data
@@ -92,7 +92,7 @@ No need to standardize the data
 ```{r}
 water_quality1<-names(select_if(water_quality, is.factor))
 water_quality1
-str(water_quality)
+#str(water_quality)
 table(water_quality$Potability)[2]/sum(table(water_quality$Potability))
 #prevalence=0.40
 water_quality$Potability <- recode(water_quality$Potability, 
@@ -205,11 +205,10 @@ confusionMatrix(as.factor(water_quality_predict$aggregate),as.factor(test$Potabi
 ```
 
 # Decision Tree
-
-#### Read in the data
 ```{r}
 #water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
-water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+#water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+water_quality <- read.csv("~/Desktop/R/water-quality-project/water_potability.csv")
 #head(water_quality)
 #dim(water_quality)
 ```
@@ -377,7 +376,8 @@ adjust_thres(water_pred_tune2$non_potable,y=.6,tune$Potability)
 
 
 ```{r}
-water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+#water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+water_quality <- read.csv("~/Desktop/R/water-quality-project/water_potability.csv")
 
 water_quality <- na.omit(water_quality)
 water_quality <- na.omit(water_quality)

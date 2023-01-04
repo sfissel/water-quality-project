@@ -1638,8 +1638,8 @@ objects.</p>
 <div id="rename-and-factorize-the-potability-variable" class="section level3">
 <h3>Rename and factorize the ‘Potability’ variable</h3>
 <p>We renamed the categorical values (1 and 0) to “potable” and
-“non_potable” We are focusing on non potability of drinking water, so
-our positive value is “non_potable”</p>
+“non_potable” </br> We are focusing on non potability of drinking water,
+so our positive value is “non_potable”</p>
 <pre class="r"><code>water_quality$Potability &lt;- as.factor(water_quality$Potability)
 water_quality$Potability &lt;- fct_collapse(water_quality$Potability, 
                            potable = &quot;1&quot;,
