@@ -66,7 +66,7 @@ water_quality$Potability <- fct_collapse(water_quality$Potability,
                            non_potable = "0")
 ```
 
-### Splitting the data & Tuning & Test
+### Splitting the data with tuning and test & Creating Decision Trees
 ```{r}
 #We do not need to check for correlated variables because correlation does not impact decision trees.
 #Decision trees make greedy, localized decisions that are not dependent on previous steps or other variables in the tree model.  
@@ -184,7 +184,7 @@ water_eval <- caret::confusionMatrix(water_pred_tune_labels2,
 ```
 
 ### Adjusting Threshold
-We were adjusting threshold from 0.2 to 0.8, and found 0.6 is a good point considering the balance of sensitivity and specificity. However, the accuracy of the model is still low, so we need to improve on our model and reduce the False Negative values.
+We were adjusting threshold between 0.2 and 0.8, then found 0.6 is a good point considering the balance of sensitivity and specificity. However, the accuracy of the model is still low, so we need to improve on our model and reduce the False Negative values.
 ```{r}
 # With the percentages you generated in step 10,select several different threshold levels using the threshold function we created and interpret the results. What patterns do you notice, did the evaluation metrics change?
 
