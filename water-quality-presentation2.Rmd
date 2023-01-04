@@ -53,169 +53,22 @@ library(RColorBrewer)
 ```
 
 # Updates
-* Working on  ML models
-    + Random Forest & Decision Tree
+* Working on ML models
+    + Decision Tree & Random forest
 * Working on Shiny app using R
     + Visualizations will help us see trends in the data that may be explained by
     our ML models and further understand what levels of substances are contained 
     in drinking water that is claimed to be "potable" though they can have
     adverse effects
-    
-# Random Forest Classifier
-
-### Load the Data
-```{r}
-getwd()
-#water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
-water_quality <- read.csv("~/Desktop/R/water-quality-project/water_potability.csv")
-```
-
-
-### Finish any other data prep (one-hot encode, reduce factor levels)
-```{r}
-dim(water_quality) #10 columns, 3276 rows
-sum(is.na(water_quality)) #1434 missing values
-colSums(is.na(water_quality))#?colSums
-#missing values found in ph, sulfate, and trihalomethanes
-#Delete missing values
-water_quality <- water_quality[complete.cases(water_quality),]
-sum(is.na(water_quality))
-#str(water_quality)
-#converting target variable, potability to a factor:
-water_quality$Potability <- factor(water_quality$Potability)
-#str(water_quality)
-```
-
-No need to standardize the data
-
-### Prevalence
-```{r}
-water_quality1<-names(select_if(water_quality, is.factor))
-water_quality1
-#str(water_quality)
-table(water_quality$Potability)[2]/sum(table(water_quality$Potability))
-#prevalence=0.40
-water_quality$Potability <- recode(water_quality$Potability, 
-                           '0' = 'Non_Potable', 
-                            '1' = 'Potable')
-```
-
-
-### Test, tune and training sets 
-```{r}
-set.seed(1999)
-part_index_1 <- caret::createDataPartition(water_quality$Potability,
-                                           times=1,
-                                           p = 0.80,
-                                           groups=1,
-                                           list=FALSE)
-train <- water_quality[part_index_1, ]
-tune_and_test <- water_quality[-part_index_1, ]
-train
-tune_and_test_index <- createDataPartition(water_quality$Potability,
-                                           p = .1,
-                                           list = FALSE,
-                                           times = 1)
-tune <- tune_and_test[tune_and_test_index, ]
-test <- tune_and_test[-tune_and_test_index, ]
-dim(train)
-#1609  14
-dim(test)
-#367   14
-dim(tune)
-#202  14
-```
-
-
-### Calculate the initial mtry level 
-```{r}
-water_quality_tune <- function(x){
-  water_quality <- dim(x)[2]-1
-  sqrt(water_quality)
-}
-water_quality_tune(water_quality)
-# = 3
-```
-
-### Run the initial RF model with 1000 trees
-```{r}
-water_quality_RF = randomForest(as.factor(Potability)~.,          
-                            train,     
-                            ntree = 1000,  
-                            mtry = 3, 
-                            replace = TRUE,      
-                            sampsize = 100,      
-                            nodesize = 4,        
-                            
-                            importance = TRUE,   
-                           
-                            proximity = FALSE, 
-                            norm.votes = TRUE,
-                            do.trace = TRUE,     
-                            keep.forest = TRUE, 
-                            keep.inbag = TRUE)  
-view(water_quality_RF)
-```
-
-### Variable Importance
-```{r}
-set.seed(1)
-varImp(water_quality_RF) 
-```
-
-### Using the training and tune datasets to tune the model 
-#### - In consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output.
-```{r}
-#### Optimize the random forest model ####
-set.seed(1984)	
-water_quality_RF_2 = randomForest(as.factor(Potability)~.,          #<- 
-                              train,    
-                              ntree = 1000,     
-                              mtry = 6,          
-                              replace = TRUE,   
-                             
-                              sampsize = 200,    
-                              nodesize = 10, 
-                              importance = TRUE,  
-                              proximity = FALSE, 
-                              norm.votes = TRUE, 
-                              do.trace = TRUE, 
-                              keep.forest = TRUE, 
-                              keep.inbag = TRUE) 
-```
-
-### Evaluate the model using the test dataset. 
-```{r}
-water_quality_predict = predict(water_quality_RF_2,      #<- a randomForest model
-                            test,      #<- the test data set to use
-                            type = "response",   #<- what results to produce, see the help menu for the options
-                            predict.all = TRUE)
-str(water_quality_predict)
-water_quality_RF_2$confusion
-#            Non_Potable Potable class.error
-#Non_Potable         887      73  0.07604167
-#Potable             464     185  0.71494607
-water_quality_RF$confusion
-#            Non_Potable Potable class.error
-#Non_Potable         910      50  0.05208333
-#Potable             525     124  0.80893683
-library(caret)
-confusionMatrix(as.factor(water_quality_predict$aggregate),as.factor(test$Potability),positive = "Potable", 
-                dnn=c("Prediction", "Actual"), mode = "everything")
-```
 
 # Decision Tree
+### Load & Clean the data
+There were 1/3 missing values in Sulfate variable, but we didn’t delete it because sulfate showed one of the crucial factors for predicting non-potability because it leads to diarrhea and some problems. After handling with the missing values, we have 2011 objects.
 ```{r}
 #water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
 #water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
 water_quality <- read.csv("~/Desktop/R/water-quality-project/water_potability.csv")
-#head(water_quality)
-#dim(water_quality)
-```
 
-### Clean the data
-There were 1/3 missing values in Sulfate variable, but we didn’t delete it because sulfate showed one of the crucial factors for predicting non-potability because it leads to diarrhea and some problems. After handling with the missing values, we have 2011 objects.
-```{r}
 water_quality <- water_quality[complete.cases(water_quality), ]
 #dim(water_quality)
 ```
@@ -362,6 +215,139 @@ adjust_thres <- function(x, y, z) {
 }
 adjust_thres(water_pred_tune2$non_potable,y=.6,tune$Potability)
 ```
+
+    
+# Random Forest Classifier
+
+```{r}
+#getwd()
+#water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+water_quality <- read.csv("~/Desktop/R/water-quality-project/water_potability.csv")
+
+
+#dim(water_quality) #10 columns, 3276 rows
+#sum(is.na(water_quality)) #1434 missing values
+#colSums(is.na(water_quality))#?colSums
+#missing values found in ph, sulfate, and trihalomethanes
+#Delete missing values
+water_quality <- water_quality[complete.cases(water_quality),]
+#sum(is.na(water_quality))
+#str(water_quality)
+#converting target variable, potability to a factor:
+water_quality$Potability <- factor(water_quality$Potability)
+#str(water_quality)
+
+### Prevalence
+water_quality1<-names(select_if(water_quality, is.factor))
+#str(water_quality)
+#table(water_quality$Potability)[2]/sum(table(water_quality$Potability))
+#prevalence=0.40
+water_quality$Potability <- recode(water_quality$Potability, 
+                           '0' = 'Non_Potable', 
+                            '1' = 'Potable')
+
+### Test, tune and training sets 
+set.seed(1999)
+part_index_1 <- caret::createDataPartition(water_quality$Potability,
+                                           times=1,
+                                           p = 0.80,
+                                           groups=1,
+                                           list=FALSE)
+train <- water_quality[part_index_1, ]
+tune_and_test <- water_quality[-part_index_1, ]
+#train
+tune_and_test_index <- createDataPartition(water_quality$Potability,
+                                           p = .1,
+                                           list = FALSE,
+                                           times = 1)
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+#dim(train)
+#1609  14
+#dim(test)
+#367   14
+#dim(tune)
+#202  14
+```
+
+
+### Calculate the initial mtry level 
+```{r}
+water_quality_tune <- function(x){
+  water_quality <- dim(x)[2]-1
+  sqrt(water_quality)
+}
+water_quality_tune(water_quality)
+# = 3
+```
+
+### Run the initial RF model with 1000 trees
+```{r}
+water_quality_RF = randomForest(as.factor(Potability)~.,          
+                            train,     
+                            ntree = 1000,  
+                            mtry = 3, 
+                            replace = TRUE,      
+                            sampsize = 100,      
+                            nodesize = 4,        
+                            
+                            importance = TRUE,   
+                           
+                            proximity = FALSE, 
+                            norm.votes = TRUE,
+                            do.trace = TRUE,     
+                            keep.forest = TRUE, 
+                            keep.inbag = TRUE)  
+#View(water_quality_RF)
+```
+
+### Variable Importance
+```{r}
+set.seed(1)
+varImp(water_quality_RF) 
+```
+
+### Using the training and tune datasets to tune the model 
+#### - In consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output.
+```{r}
+#### Optimize the random forest model ####
+set.seed(1984)	
+water_quality_RF_2 = randomForest(as.factor(Potability)~.,          #<- 
+                              train,    
+                              ntree = 1000,     
+                              mtry = 6,          
+                              replace = TRUE,   
+                             
+                              sampsize = 200,    
+                              nodesize = 10, 
+                              importance = TRUE,  
+                              proximity = FALSE, 
+                              norm.votes = TRUE, 
+                              do.trace = TRUE, 
+                              keep.forest = TRUE, 
+                              keep.inbag = TRUE) 
+```
+
+### Evaluate the model using the test dataset 
+```{r}
+water_quality_predict = predict(water_quality_RF_2,      #<- a randomForest model
+                            test,      #<- the test data set to use
+                            type = "response",   #<- what results to produce, see the help menu for the options
+                            predict.all = TRUE)
+str(water_quality_predict)
+water_quality_RF_2$confusion
+#            Non_Potable Potable class.error
+#Non_Potable         887      73  0.07604167
+#Potable             464     185  0.71494607
+water_quality_RF$confusion
+#            Non_Potable Potable class.error
+#Non_Potable         910      50  0.05208333
+#Potable             525     124  0.80893683
+library(caret)
+confusionMatrix(as.factor(water_quality_predict$aggregate),as.factor(test$Potability),positive = "Potable", 
+                dnn=c("Prediction", "Actual"), mode = "everything")
+```
+
 
 # ML Models
 * Next steps:
