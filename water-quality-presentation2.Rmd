@@ -1,0 +1,735 @@
+---
+title: "Water Quality Presentation 2"
+author: "Group 3: Stephanie Fissel, Beza Gashe, Claire Yoon"
+date: "January 4, 2023"
+output: 
+  html_document:
+    theme: lumen
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 3
+editor_options: 
+chunk_output_type: inline
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(plotly)
+library(shiny)
+library(shinyWidgets)
+library(tidyverse)
+library(aod)
+library(vtable)
+library(scales)
+library(reshape2)
+library(gridExtra)
+library(grid)
+library(cowplot)
+library(dplyr)
+library(data.table)
+library(e1071)
+library(htmltools)
+library(devtools)
+library(caret)
+library(NbClust)
+library(randomForest)
+library(rio)
+library(plyr)
+library(ROCR)
+library(rpart)
+library(psych)
+library(pROC)
+library(rpart.plot)
+library(rattle)
+library(class)
+library(MLmetrics)
+library(mltools)
+library(RColorBrewer)
+```
+
+# Updates
+* Working on  ML models
+    + Random Forest & Decision Tree
+* Working on Shiny app using R
+    + Visualizations will help us see trends in the data that may be explained by
+    our ML models and further understand what levels of substances are contained 
+    in drinking water that is claimed to be "potable" though they can have
+    adverse effects
+    
+
+# Random Forest Classifier
+
+## Load the Data
+```{r}
+getwd()
+read.csv("water_potability.csv")
+water_quality <- read.csv("water_potability.csv")
+head(water_quality)
+str(water_quality)
+```
+
+
+## Finish data prep (one-hot encode, reduce factor levels)
+```{r}
+dim(water_quality) #10 columns, 3276 rows
+sum(is.na(water_quality)) #1434 missing values
+colSums(is.na(water_quality))#?colSums
+#missing values found in ph, sulfate, and trihalomethanes
+#Delete missing values
+water_quality <- water_quality[complete.cases(water_quality),]
+sum(is.na(water_quality))
+str(water_quality)
+head(water_quality)
+#converting target variable, potability to a factor:
+water_quality$Potability <- factor(water_quality$Potability)
+str(water_quality)
+```
+No need to standardize the data
+
+Prevalence
+```{r}
+water_quality1<-names(select_if(water_quality, is.factor))
+water_quality1
+str(water_quality)
+table(water_quality$Potability)[2]/sum(table(water_quality$Potability))
+#prevalence=0.40
+water_quality$Potability <- recode(water_quality$Potability, 
+                           '0' = 'Non_Potable', 
+                            '1' = 'Potable')
+```
+
+## Test, tune and training sets 
+```{r}
+set.seed(1999)
+part_index_1 <- caret::createDataPartition(water_quality$Potability,
+                                           times=1,
+                                           p = 0.80,
+                                           groups=1,
+                                           list=FALSE)
+train <- water_quality[part_index_1, ]
+tune_and_test <- water_quality[-part_index_1, ]
+train
+tune_and_test_index <- createDataPartition(water_quality$Potability,
+                                           p = .1,
+                                           list = FALSE,
+                                           times = 1)
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+dim(train)
+#1609  14
+dim(test)
+#367   14
+dim(tune)
+#202  14
+```
+
+## Calculate the initial mtry level 
+```{r}
+water_quality_tune <- function(x){
+  water_quality <- dim(x)[2]-1
+  sqrt(water_quality)
+}
+water_quality_tune(water_quality)
+# = 3
+```
+
+## Run the initial RF model with 1000 trees
+```{r}
+water_quality_RF = randomForest(as.factor(Potability)~.,          
+                            train,     
+                            ntree = 1000,  
+                            mtry = 3, 
+                            replace = TRUE,      
+                            sampsize = 100,      
+                            nodesize = 5,        
+                            
+                            importance = TRUE,   
+                           
+                            proximity = FALSE, 
+                            norm.votes = TRUE,
+                            do.trace = TRUE,     
+                            keep.forest = TRUE, 
+                            keep.inbag = TRUE)  
+view(water_quality_RF)
+```
+
+Look at the variable importance measures
+```{r}
+set.seed(1)
+varImp(water_quality_RF) 
+```
+Variable Importance: In a model predicting salaries above/below 50k, the metrics with the greatest variable importance are capital gain, education, age, and marital status. The least important variables are race and final weight. 
+
+Using the training and tune datasets to tune the model in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output.
+```{r}
+#### Optimize the random forest model ####
+set.seed(1984)	
+water_quality_RF_2 = randomForest(as.factor(Potability)~.,          #<- 
+                              train,    
+                              ntree = 1000,     
+                              mtry = 6,          
+                              replace = TRUE,   
+                             
+                              sampsize = 200,    
+                              nodesize = 20, 
+                              importance = TRUE,  
+                              proximity = FALSE, 
+                              norm.votes = TRUE, 
+                              do.trace = TRUE, 
+                              keep.forest = TRUE, 
+                              keep.inbag = TRUE) 
+```
+
+Evaluate the model using the test dataset. 
+```{r}
+water_quality_predict = predict(water_quality_RF_2,      #<- a randomForest model
+                            test,      #<- the test data set to use
+                            type = "response",   #<- what results to produce, see the help menu for the options
+                            predict.all = TRUE)
+str(water_quality_predict)
+water_quality_RF_2$confusion #On the oob data from the model
+#     below above class.error
+#            Non_Potable Potable class.error
+#Non_Potable         861      99   0.1031250
+#Potable             442     207   0.6810478
+water_quality_RF$confusion
+#            Non_Potable Potable class.error
+#Non_Potable         910      50  0.05208333
+#Potable             525     124  0.80893683
+#One change to notice between the two matrices is that the error decreased from 0.1 to 0.05% for non-potability. 
+library(caret)
+confusionMatrix(as.factor(water_quality_predict$aggregate),as.factor(test$Potability),positive = "Potable", 
+                dnn=c("Prediction", "Actual"), mode = "everything")
+
+```
+
+## Decision Tree
+
+### Clean the data
+```{r}
+water_quality <- water_quality[complete.cases(water_quality), ]
+dim(water_quality)
+```
+
+### Rename and factorize the 'Potability' variable
+```{r}
+water_quality$Potability <- as.factor(water_quality$Potability)
+water_quality$Potability <- fct_collapse(water_quality$Potability, 
+                           potable = "1",
+                           non_potable = "0")
+```
+
+### Splitting the data & Creating Decision trees
+```{r}
+#We do not need to check for correlated variables because correlation does not impact decision trees.
+#Decision trees make greedy, localized decisions that are not dependent on previous steps or other variables in the tree model.  
+set.seed(777)
+partition <- caret::createDataPartition(water_quality$Potability,
+                                           times=1,
+                                           p = 0.80,
+                                           groups=1,
+                                           list=FALSE)
+train <- water_quality[partition, ]
+tune_and_test <- water_quality[-partition, ]
+```
+## Train
+```{r}
+tune_and_test_index <- createDataPartition(tune_and_test$Potability,
+                                           p = .5,
+                                           list = FALSE,
+                                           times = 1)
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+#dim(train)
+#dim(test) 
+#dim(tune)
+```
+## Build the model
+Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
+```{r}
+str(water_quality)
+features <- train[,-10] # dropping the target variable
+target <- train$Potability
+str(features)
+str(target)
+fitControl <- trainControl(method = "repeatedcv",
+                          number = 10,
+                          repeats = 5,
+                          classProbs = TRUE,
+                          summaryFunction = twoClassSummary) 
+tree.grid <- expand.grid(maxdepth=c(1:6))
+```
+## Train the model without setting tree grid
+```{r}
+set.seed(777)
+water_mdl1 <- train(x=features,
+                y=target,
+                method="rpart2",
+                trControl=fitControl,
+                metric="ROC")
+plot(water_mdl1)
+varImp(water_mdl1)
+rpart.plot(water_mdl1$finalModel, type=1,extra=101)
+water_mdl1 # maxdepth is 12
+```
+## Train the model
+```{r}
+set.seed(777)
+water_mdl2 <- train(x=features,
+                y=target,
+                method="rpart2",
+                trControl=fitControl,
+                tuneGrid=tree.grid,
+                metric="ROC")
+plot(water_mdl2)
+varImp(water_mdl2)
+rpart.plot(water_mdl2$finalModel, type=1,extra=101)
+water_mdl2 # maxdepth is 6
+```
+```{r}
+predictandCM<- function(model,data,modeltype,ref)
+{
+  pred <-predict(model,data,type=modeltype)
+  confusionMatrix(pred, reference=ref, positive = 'non_potable')
+}
+predictandCM(water_mdl1, tune, "raw", tune$Potability)
+water_pred_tune = predict(water_mdl1,tune,tune$Potability, type= "prob")
+water_pred_tune_labels = predict(water_mdl1,tune,tune$Potability,type = "raw")
+plot(density(water_pred_tune$non_potable))
+predictandCM(water_mdl2, tune, "raw", tune$Potability) 
+water_pred_tune2 = predict(water_mdl2,tune,tune$Potability, type= "prob")
+water_pred_tune_labels2 = predict(water_mdl2,tune,tune$Potability,type = "raw")
+plot(density(water_pred_tune2$non_potable))
+#View(as_tibble(water_pred_tune_labels))
+```
+
+## Use the confusion matrix function
+```{r}
+# Use the the confusion matrix function on your predictions to check a variety of metrics and comment on the metric that might be best for this type of analysis given your question.  
+water_eval <- caret::confusionMatrix(water_pred_tune_labels, 
+                as.factor(tune$Potability), 
+                dnn=c("Prediction", "Actual"),
+                positive="non_potable",
+                mode = "everything")
+#water_eval
+```
+```{r}
+# With the percentages you generated in step 10,select several different threshold levels using the threshold function we created and interpret the results. What patterns do you notice, did the evaluation metrics change?
+adjust_thres <- function(x, y, z) {
+  #x=pred_probablities, y=threshold, z=tune_outcome
+  thres <- as.factor(ifelse(x > y, "non_potable","potable"))
+  confusionMatrix(thres, z, positive = "non_potable", dnn=c("Prediction", "Actual"), mode = "everything")
+}
+#adjust_thres(water_pred_tune$non_potable,y=.4,tune$Potability)
+```
+
+# ML Models
+* Next steps:
+    + Improving the model and accuracy
+
+# Shiny App (in progress)
+* Next steps:
+    + Deploy to Shiny.io
+    + Add more context
+    + Possibly add interactive inputs
+    + Analyze visualizations and summarize conclusions
+
+
+```{r}
+water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+
+water_quality <- na.omit(water_quality)
+water_quality <- na.omit(water_quality)
+water_quality$Potability <- factor(water_quality$Potability)
+
+np <- round(1998/3276 * 100)
+p <- round(1278/3276 * 100)
+# Subset test data
+data <- data.frame(
+  category=c("Non-Potable", "Potable"),
+  count=c(np, p)
+)
+
+# Compute percentages
+data$fraction = data$count / sum(data$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+data$ymax = cumsum(data$fraction)
+
+# Compute the bottom of each rectangle
+data$ymin = c(0, head(data$ymax, n=-1))
+
+# Compute label position
+data$labelPosition <- (data$ymax + data$ymin) / 2
+
+# Compute a good label
+data$label <- paste0(data$category, ": ", data$count, "%")
+
+
+
+shinyApp(
+  ui <- fluidPage(
+    # App title
+    titlePanel("METRICS"),
+    mainPanel(
+      
+      tabsetPanel(type = "tabs",
+                  tabPanel("Overall", plotOutput("overall"), width = "100%"),
+                  tabPanel("pH", plotOutput("ph")),
+                  tabPanel("Hardness", plotOutput("hardness")),
+                  tabPanel("Solids", plotOutput("solids")),
+                  tabPanel("Chloramines", plotOutput("chloramines")),
+                  tabPanel("Conductivity", plotOutput("conductivity")),
+                  tabPanel("Organic Carbon", plotOutput("organic_carbon")),
+                  tabPanel("Trihalomethanes", plotOutput("trihalomethanes")),
+                  tabPanel("Turbidity", plotOutput("turbidity")),
+                  ))
+    ),
+  
+  server <- function(input, output) {
+    
+    output$overall <- renderPlot({
+      
+      ggplot(data, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=category)) +
+        geom_rect() +
+        geom_label( x=3.5, aes(y=labelPosition, label=label), size=5) +
+        scale_fill_manual(values = c("#E86363", "#63E871")) + 
+        coord_polar(theta="y") +
+        xlim(c(2, 4)) +
+        theme_void() +
+        theme(legend.position = "none")
+    }, height = 700, width = 900)
+    
+    output$ph <- renderPlot({
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=ph)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=ph)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = ph, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_x_continuous(breaks= 0:14) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 6.5, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        geom_vline(xintercept = 8.5, color = "darkslategrey", linetype = "dashed", size=0.3) +
+        labs(x = "pH Level (pH)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 5, y = 50, label = "< 6.5 is acidic") +
+        annotate("text", x = 10, y = 50, label = "> 8.5 is basic") + 
+        annotate("text", x = 7.5, y = 62, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 7.5, y = 60, label = "levels", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("pH Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+      })
+      
+    output$hardness <- renderPlot({
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Hardness)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Hardness)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Hardness, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 75, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        geom_vline(xintercept = 150, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        geom_vline(xintercept = 300, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Hardness Level (mg/L)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 75, y = 45, label = "< 75 is soft") +
+        annotate("text", x = 110, y = 50, label = "> 75 is moderately hard") +
+        annotate("text", x = 170, y = 50, label = "> 150 is hard") +
+        annotate("text", x = 305, y = 50, label = "> 300 is very hard")
+      
+      title <- ggdraw() + draw_label("Hardness Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    
+    output$solids <- renderPlot({
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Solids)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Solids)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Solids, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 500, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        geom_vline(xintercept = 1000, color = "darkslategrey", linetype = "dashed", size=0.3) +
+        labs(x = "Solid Level (mg/l)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 6000, y = 50, label = "> 1000 is high") + 
+        annotate("text", x = 800, y = 62, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 800, y = 60, label = "levels", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Solid Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    
+    output$chloramines <- renderPlot({
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Chloramines)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Chloramines)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Chloramines, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 4, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Chloramine Level (mg/L)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 4.8, y = 45, label = "> 4 is high") +
+        annotate("text", x = 4, y = 55, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 4, y = 53, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Chloramine Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    
+    output$conductivity <- renderPlot({
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Conductivity)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(Conductivity)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Conductivity, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 400, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Conductivity Level (μS/cm)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 460, y = 42, label = "> 400 is high") +
+        annotate("text", x = 400, y = 47, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 400, y = 45, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Conductivity Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    
+    output$organic_carbon <- renderPlot({
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Organic_carbon)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Organic_carbon)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Organic_carbon, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 2, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Organic Carbon Level (mg/L)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 4, y = 35, label = "> 2 is high") + 
+        annotate("text", x = 2.5, y = 43, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 2.5, y = 41, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Organic Carbon Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    
+    output$trihalomethanes <- renderPlot({
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Trihalomethanes)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Trihalomethanes)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Trihalomethanes, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 80, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Trihalomethanes Level (ppm)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 90, y = 40, label = "> 80 is high") +
+        annotate("text", x = 80, y = 47, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 80, y = 45, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Trihalomethanes Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    
+    output$turbidity <- renderPlot({
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Turbidity)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Turbidity)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Turbidity, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 5, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Turbidity Level (NTU)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 5.4, y = 37, label = "> 5 is high") +
+        annotate("text", x = 5, y = 45, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 5, y = 43, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Turbidity Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    
+    })
+```
+
+
+
+
+
+
