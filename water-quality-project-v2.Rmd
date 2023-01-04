@@ -45,17 +45,20 @@ library(RColorBrewer)
 #water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
 water_quality <- read.csv("~/Desktop/R/water-quality-project/water_potability.csv")
 
-head(water_quality)
-dim(water_quality)
+#head(water_quality)
+#dim(water_quality)
 ```
 
 ### Clean the data
+There were 1/3 missing values in Sulfate variable, but we didn’t delete it because sulfate showed one of the crucial factors for predicting non-potability because it leads to diarrhea and some problems. After handling with the missing values, we have 2011 objects.
 ```{r}
 water_quality <- water_quality[complete.cases(water_quality), ]
-dim(water_quality)
+#dim(water_quality)
 ```
 
 ### Rename and factorize the 'Potability' variable
+We renamed the categorical values (1 and 0) to "potable" and "non_potable"
+We are focusing on non potability of drinking water, so our positive value is "non_potable"
 ```{r}
 water_quality$Potability <- as.factor(water_quality$Potability)
 water_quality$Potability <- fct_collapse(water_quality$Potability, 
@@ -63,7 +66,7 @@ water_quality$Potability <- fct_collapse(water_quality$Potability,
                            non_potable = "0")
 ```
 
-### Splitting the data & Creating Decision trees
+### Splitting the data & Tuning & Test
 ```{r}
 #We do not need to check for correlated variables because correlation does not impact decision trees.
 #Decision trees make greedy, localized decisions that are not dependent on previous steps or other variables in the tree model.  
@@ -152,17 +155,36 @@ plot(density(water_pred_tune2$non_potable))
 #View(as_tibble(water_pred_tune_labels))
 ```
 
+### Understanding Confusion Matrix
+True Positive(TP) </br>
+- Predicted condition: non-potable </br>
+- Actual condition: non-potable </br>
+</br>
+False Positive(FP) </br>
+- Predicted condition: non-potable </br>
+- Actual condition: potable </br>
+</br>
+False Negative(FN) </br>
+- Predicted condition: potable </br>
+- Actual condition: non-potable </br>
+</br>
+True Negative(TN) </br>
+- Predicted condition: potable </br>
+- Actual condition: potable </br>
 
 ```{r}
 # Use the the confusion matrix function on your predictions to check a variety of metrics and comment on the metric that might be best for this type of analysis given your question.  
 
-water_eval <- caret::confusionMatrix(water_pred_tune_labels, 
+water_eval <- caret::confusionMatrix(water_pred_tune_labels2, 
                 as.factor(tune$Potability), 
                 dnn=c("Prediction", "Actual"),
                 positive="non_potable",
                 mode = "everything")
 #water_eval
 ```
+
+### Adjusting Threshold
+We were adjusting threshold from 0.2 to 0.8, and found 0.6 is a good point considering the balance of sensitivity and specificity. However, the accuracy of the model is still low, so we need to improve on our model and reduce the False Negative values.
 ```{r}
 # With the percentages you generated in step 10,select several different threshold levels using the threshold function we created and interpret the results. What patterns do you notice, did the evaluation metrics change?
 
@@ -172,5 +194,5 @@ adjust_thres <- function(x, y, z) {
   confusionMatrix(thres, z, positive = "non_potable", dnn=c("Prediction", "Actual"), mode = "everything")
 }
 
-#adjust_thres(water_pred_tune$non_potable,y=.4,tune$Potability)
+adjust_thres(water_pred_tune2$non_potable,y=.6,tune$Potability)
 ```
