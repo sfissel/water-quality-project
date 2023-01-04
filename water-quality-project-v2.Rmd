@@ -1,7 +1,7 @@
 ---
-title: "Water Quality Project"
+title: "Water Quality Presentation2"
 author: "Group 3: Stephanie Fissel, Beza Gashe, Claire Yoon"
-date: "January 3, 2023"
+date: "January 4, 2023"
 output: 
   html_document:
     theme: lumen
@@ -63,9 +63,10 @@ water_quality$Potability <- fct_collapse(water_quality$Potability,
                            non_potable = "0")
 ```
 
-
 ### Splitting the data & Creating Decision trees
 ```{r}
+#We do not need to check for correlated variables because correlation does not impact decision trees.
+#Decision trees make greedy, localized decisions that are not dependent on previous steps or other variables in the tree model.  
 set.seed(777)
 partition <- caret::createDataPartition(water_quality$Potability,
                                            times=1,
@@ -106,34 +107,70 @@ tree.grid <- expand.grid(maxdepth=c(1:6))
 
 # Train the model without setting tree grid
 set.seed(777)
-water_mdl <- train(x=features,
+water_mdl1 <- train(x=features,
                 y=target,
                 method="rpart2",
                 trControl=fitControl,
                 metric="ROC")
-plot(water_mdl)
-varImp(water_mdl)
-rpart.plot(water_mdl$finalModel, type=5,extra=101)
-water_mdl # maxdepth is 12
+plot(water_mdl1)
+varImp(water_mdl1)
+rpart.plot(water_mdl1$finalModel, type=1,extra=101)
+water_mdl1 # maxdepth is 12
 
 # Train the model
 set.seed(777)
-water_quality_mdl2 <- train(x=features,
+water_mdl2 <- train(x=features,
                 y=target,
                 method="rpart2",
                 trControl=fitControl,
                 tuneGrid=tree.grid,
                 metric="ROC")
 
-plot(water_quality_mdl2)
-varImp(water_quality_mdl2)
+plot(water_mdl2)
+varImp(water_mdl2)
 
-rpart.plot(water_quality_mdl2$finalModel, type=1,extra=101)
+rpart.plot(water_mdl2$finalModel, type=1,extra=101)
 
-water_quality_mdl2 # maxdepth is 6
+water_mdl2 # maxdepth is 6
 ```
+```{r}
+predictandCM<- function(model,data,modeltype,ref)
+{
+  pred <-predict(model,data,type=modeltype)
+  confusionMatrix(pred, reference=ref, positive = 'non_potable')
+}
+
+predictandCM(water_mdl1, tune, "raw", tune$Potability)
+
+predictandCM(water_mdl2, tune, "raw", tune$Potability) 
+
+water_pred_tune = predict(water_mdl1,tune,tune$Potability, type= "prob")
+
+water_pred_tune_labels = predict(water_mdl1,tune,tune$Potability,type = "raw")
+
+View(as_tibble(water_pred_tune_labels))
+```
+
 
 ```{r}
+# Use the the confusion matrix function on your predictions to check a variety of metrics and comment on the metric that might be best for this type of analysis given your question.  
 
+water_eval <- caret::confusionMatrix(water_pred_tune_labels, 
+                as.factor(tune$Potability), 
+                dnn=c("Prediction", "Actual"),
+                positive="non_potable",
+                mode = "everything")
+water_eval
 ```
+```{r}
+# With the percentages you generated in step 10,select several different threshold levels using the threshold function we created and interpret the results. What patterns do you notice, did the evaluation metrics change?
+plot(density(water_pred_tune$non_potable))
 
+adjust_thres <- function(x, y, z) {
+  #x=pred_probablities, y=threshold, z=tune_outcome
+  thres <- as.factor(ifelse(x > y, "non_potable","potable"))
+  confusionMatrix(thres, z, positive = "non_potable", dnn=c("Prediction", "Actual"), mode = "everything")
+}
+
+adjust_thres(water_pred_tune$non_potable,y=.4,tune$Potability)
+```

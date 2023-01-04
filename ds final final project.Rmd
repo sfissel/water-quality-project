@@ -139,7 +139,7 @@ water_quality_RF = randomForest(as.factor(Potability)~.,
                             do.trace = TRUE,     
                             keep.forest = TRUE, 
                             keep.inbag = TRUE)  
-view(water_quality_RF)
+View(water_quality_RF)
 ```
 
 
