@@ -67,6 +67,7 @@ water_quality$Potability <- fct_collapse(water_quality$Potability,
 ```
 
 ### Splitting the data with tuning and test & Creating Decision Trees
+#### First Decision Tree Model
 ```{r}
 #We do not need to check for correlated variables because correlation does not impact decision trees.
 #Decision trees make greedy, localized decisions that are not dependent on previous steps or other variables in the tree model.  
@@ -94,12 +95,12 @@ test <- tune_and_test[-tune_and_test_index, ]
 
 # Build the model
 # Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
-str(water_quality)
+#str(water_quality)
 features <- train[,-10] # dropping the target variable
 target <- train$Potability
-str(features)
+#str(features)
 
-str(target)
+#str(target)
 fitControl <- trainControl(method = "repeatedcv",
                           number = 10,
                           repeats = 5,
@@ -118,8 +119,13 @@ water_mdl1 <- train(x=features,
 plot(water_mdl1)
 varImp(water_mdl1)
 rpart.plot(water_mdl1$finalModel, type=1,extra=101)
-water_mdl1 # maxdepth is 12
+water_mdl1 # maxdepth is 11
 
+```
+
+
+#### Second Decision Tree Model
+```{r}
 # Train the model
 set.seed(777)
 water_mdl2 <- train(x=features,
@@ -136,6 +142,11 @@ rpart.plot(water_mdl2$finalModel, type=1,extra=101)
 
 water_mdl2 # maxdepth is 6
 ```
+
+
+### Confusion Matrix, Statistics, and Density Plot on Two Decision Trees
+#### First Model
+
 ```{r}
 predictandCM<- function(model,data,modeltype,ref)
 {
@@ -148,12 +159,17 @@ water_pred_tune = predict(water_mdl1,tune,tune$Potability, type= "prob")
 water_pred_tune_labels = predict(water_mdl1,tune,tune$Potability,type = "raw")
 plot(density(water_pred_tune$non_potable))
 
+```
+
+#### Second Model
+```{r}
 predictandCM(water_mdl2, tune, "raw", tune$Potability) 
 water_pred_tune2 = predict(water_mdl2,tune,tune$Potability, type= "prob")
 water_pred_tune_labels2 = predict(water_mdl2,tune,tune$Potability,type = "raw")
 plot(density(water_pred_tune2$non_potable))
 #View(as_tibble(water_pred_tune_labels))
 ```
+
 
 ### Understanding Confusion Matrix
 True Positive(TP) </br>
@@ -171,6 +187,8 @@ False Negative(FN) </br>
 True Negative(TN) </br>
 - Predicted condition: potable </br>
 - Actual condition: potable </br>
+<br>
+Considering the real world, False Positive doesn't really make any problems because people do not drink water if it is predicted as non-potable even though it is potable. However, the opposite case (False Negative) will cause significant problems (people will be sick), so we need to make sure to reduce False Negative portion and the model should be reliable.
 
 ```{r}
 # Use the the confusion matrix function on your predictions to check a variety of metrics and comment on the metric that might be best for this type of analysis given your question.  
@@ -183,7 +201,7 @@ water_eval <- caret::confusionMatrix(water_pred_tune_labels2,
 #water_eval
 ```
 
-### Adjusting Threshold
+### Adjusting Threshold with the Second Decision Tree Model
 We were adjusting threshold between 0.2 and 0.8, then found 0.6 is a good point considering the balance of sensitivity and specificity. However, the accuracy of the model is still low, so we need to improve on our model and reduce the False Negative values.
 ```{r}
 # With the percentages you generated in step 10,select several different threshold levels using the threshold function we created and interpret the results. What patterns do you notice, did the evaluation metrics change?
