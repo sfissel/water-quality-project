@@ -57,7 +57,7 @@ water_quality <- water_quality[complete.cases(water_quality), ]
 ```
 
 ### Rename and factorize the 'Potability' variable
-We renamed the categorical values (1 and 0) to "potable" and "non_potable"
+We renamed the categorical values (1 and 0) to "potable" and "non_potable" </br>
 We are focusing on non potability of drinking water, so our positive value is "non_potable"
 ```{r}
 water_quality$Potability <- as.factor(water_quality$Potability)
