@@ -338,13 +338,12 @@ pred_tune_tibble <- tibble(pred_class=pred_tune, pred_prob=pred_tune_prob$`non_p
 
 pred <- prediction(pred_tune_tibble$pred_prob, pred_tune_tibble$target) # use predicted prob and target at different threshold levels to build ROC curve
 
-pos_perf <- performance(pred,"tpr","fpr") # prediction for True Positive Rate and False Positive Rate 
+ROC_perf <- performance(pred,"tpr","fpr") # prediction for True Positive Rate and False Positive Rate 
+# TPR = TP / (TP + FN)
+# FPR = FP / (FP + TN)
 
-plot(pos_perf, colorize=TRUE) # plot ROC curve
+plot(ROC_perf, colorize=TRUE) # plot ROC curve
 
-neg_perf <- performance(pred,"tnr","fnr") # prediction for True Negative Rate and False Negative Rate 
-
-plot(neg_perf, colorize=TRUE) # plot ROC curve
 ```
 
 
