@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(plyr)
 library(plotly)
@@ -45,12 +45,15 @@ water_quality <- water_quality[complete.cases(water_quality), ]
 
 ### Rename and factorize the 'Potability' variable
 We renamed the categorical values (1 and 0) to "potable" and "non_potable" </br>
-We are focusing on non potability of drinking water, so our positive value is "non_potable"
 ```{r}
 water_quality$Potability <- as.factor(water_quality$Potability)
 water_quality$Potability <- fct_collapse(water_quality$Potability, 
                            potable = "1",
                            non_potable = "0")
+table(water_quality$Potability)
+str(water_quality)
+
+glimpse(water_quality)
 ```
 
 ### Splitting the data with tuning and test & Creating Decision Trees
@@ -137,52 +140,55 @@ water_mdl2 # maxdepth is 6
 predictandCM<- function(model,data,modeltype,ref)
 {
   pred <-predict(model,data,type=modeltype)
-  confusionMatrix(pred, reference=ref, positive = 'non_potable')
+  confusionMatrix(pred, reference=ref, positive = 'potable')
 }
 
 predictandCM(water_mdl1, tune, "raw", tune$Potability)
 water_pred_tune = predict(water_mdl1,tune,tune$Potability, type= "prob")
 water_pred_tune_labels = predict(water_mdl1,tune,tune$Potability,type = "raw")
-plot(density(water_pred_tune$non_potable))
+plot(density(water_pred_tune$potable))
 
 ```
-
+TN FN
+FP TP
 #### Second Model
 ```{r}
 predictandCM(water_mdl2, tune, "raw", tune$Potability) 
 water_pred_tune2 = predict(water_mdl2,tune,tune$Potability, type= "prob")
 water_pred_tune_labels2 = predict(water_mdl2,tune,tune$Potability,type = "raw")
-plot(density(water_pred_tune2$non_potable))
+plot(density(water_pred_tune2$potable))
 #View(as_tibble(water_pred_tune_labels))
 ```
 
 
 ### Understanding Confusion Matrix
-True Positive(TP): Non potable water correctly identified as non potable </br>
-- Predicted condition: non-potable </br>
-- Actual condition: non-potable </br>
+True Positive(TP): Potable water correctly identified as potable </br>
+- Predicted condition: potable </br>
+- Actual condition: potable </br>
 </br>
-False Positive(FP): Potable water incorrectly identified as non potable </br>
+False Positive(FP): Non potable water incorrectly identified as potable </br>
 - Predicted condition: non-potable </br>
 - Actual condition: potable </br>
 </br>
-False Negative(FN): Non potable water incorrectly identified as potable </br>
-- Predicted condition: potable </br>
-- Actual condition: non-potable </br>
+False Negative(FN): Potable water incorrectly identified as non-potable </br>
+- Predicted condition: non-potable </br>
+- Actual condition: potable </br>
 <br>
-True Negative(TN): Potable water correctly identified as potable </br>
-- Predicted condition: potable </br>
-- Actual condition: potable </br>
+True Negative(TN): Non potable water correctly identified as non-potable </br>
+- Predicted condition: non-potable </br>
+- Actual condition: non-potable </br>
 </br>
 
-Considering the real world situation, False Positive does not cause detrimental effects because people do not drink water if it is identified as non-potable even though it is actually potable. However, the opposite case (False Negative) will cause significant problems (people will be sick), so we need to make sure to reduce the number of False Negative and the model should be reliable.
+Considering the real world situation, False Negative does not cause detrimental effects because people do not drink water if it is identified as non-potable even though it is actually potable. However, the opposite case (False Positive) will cause significant problems (people will be sick), so we need to make sure to reduce the number of False Positive and the model should be reliable.
 
 ### Sensitivity & Specificity
 Sensitivity = number of true positives / (number of true positives + number of false negatives) </br>
-= number of non-potable water / total number of non-potable water
+= number of correctly identified as potable water / total number of potable water
 
 Specificity = number of true negatives / (total number of true negatives + number of false positives) </br>
-= number of potable water / total number of potable water
+= number of correctly identified as non-potable water / total number of non-potable water
+</br>
+Our goal is to reduce the number of False Positive and get higher Specificity
 
 ```{r}
 # Use the the confusion matrix function on your predictions to check a variety of metrics and comment on the metric that might be best for this type of analysis given your question.  
@@ -190,7 +196,7 @@ Specificity = number of true negatives / (total number of true negatives + numbe
 water_eval <- caret::confusionMatrix(water_pred_tune_labels2, 
                 as.factor(tune$Potability), 
                 dnn=c("Prediction", "Actual"),
-                positive="non_potable",
+                positive="potable",
                 mode = "everything")
 #water_eval
 ```
@@ -202,11 +208,11 @@ We were adjusting threshold between 0.2 and 0.8, then found 0.6 is a good point 
 
 adjust_thres <- function(x, y, z) {
   #x=pred_probablities, y=threshold, z=tune_outcome
-  thres <- as.factor(ifelse(x > y, "non_potable","potable"))
-  confusionMatrix(thres, z, positive = "non_potable", dnn=c("Prediction", "Actual"), mode = "everything")
+  thres <- as.factor(ifelse(x > y, "potable","non_potable"))
+  confusionMatrix(thres, z, positive = "potable", dnn=c("Prediction", "Actual"), mode = "everything")
 }
 
-adjust_thres(water_pred_tune2$non_potable,y=.6,tune$Potability)
+adjust_thres(water_pred_tune2$potable,y=.6,tune$Potability)
 ```
 
 
@@ -221,9 +227,6 @@ water_quality$Potability <- as.factor(water_quality$Potability)
 water_quality$Potability <- fct_collapse(water_quality$Potability, 
                            potable = "1",
                            non_potable = "0")
-# drop least related variable (Organic Carbon)
-water_quality <- water_quality[,-7]
-
 
 ```
 
@@ -254,7 +257,7 @@ test <- tune_and_test[-tune_and_test_index, ]
 
 # Build the model
 # Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
-features <- train[,-9] # dropping the target variable
+features <- train[,-10] # dropping the target variable
 target <- train$Potability
 
 fitControl <- trainControl(method = "repeatedcv",
@@ -320,7 +323,7 @@ table(as.factor(pred_tune), as.factor(tune$Potability))
 set.seed(777) 
 eval <- confusionMatrix(as.factor(pred_tune),   # confusion matrix on the predictions and actual values 
                 as.factor(tune$Potability),
-                positive='non_potable',  # assign the positive class 
+                positive='potable',  # assign the positive class 
                 dnn=c("Prediction", "Actual"), 
                 mode = "everything")  # output all evaluation metrics 
 
@@ -331,18 +334,21 @@ eval
 ### ROC and AUC 
 
 ```{r}
-#13 Generate a ROC and AUC output, interpret the results
+# Generate a ROC and AUC output, interpret the results
 
 # Put predictions and targets in one table 
-pred_tune_tibble <- tibble(pred_class=pred_tune, pred_prob=pred_tune_prob$`non_potable`, target=as.numeric(tune$Potability))
+pred_tune_tibble <- tibble(pred_class=pred_tune, pred_prob=pred_tune_prob$`potable`, target=as.numeric(tune$Potability))
+#pred_tune_tibble2 <- tibble(pred_class=pred_tune, pred_prob=pred_tune_prob$`non_potable`, target=as.numeric(tune$Potability))
 
 pred <- prediction(pred_tune_tibble$pred_prob, pred_tune_tibble$target) # use predicted prob and target at different threshold levels to build ROC curve
-
+#pred2 <- prediction(pred_tune_tibble2$pred_prob, pred_tune_tibble$target)
 ROC_perf <- performance(pred,"tpr","fpr") # prediction for True Positive Rate and False Positive Rate 
 # TPR = TP / (TP + FN)
 # FPR = FP / (FP + TN)
+#ROC_perf2 <- performance(pred,"tnr","fnr") # prediction for True Negative Rate and False Positive Rate 
 
 plot(ROC_perf, colorize=TRUE) # plot ROC curve
+#plot(ROC_perf2, colorize=TRUE)
 
 ```
 
@@ -351,6 +357,10 @@ plot(ROC_perf, colorize=TRUE) # plot ROC curve
 tree_perf_AUC <- performance(pred,"auc")  # calculate auc on the predictions
 
 tree_perf_AUC@y.values
+
+#tree_perf_AUC <- performance(pred2,"auc")  # calculate auc on the predictions
+
+#tree_perf_AUC@y.values
 ```
 
 ### Evaluate Model with Different Hyper-Parameters
@@ -377,33 +387,33 @@ new_mdl2 <- train(x=features,  # train the model again with the new hyper-parame
 
 
 set.seed(777) # set seed for reproducibility
-pred_tune2 = predict(new_mdl2,tune, type= "prob")$`non_potable` # predict with the new model on the tune data
+pred_tune2 = predict(new_mdl2,tune, type= "prob")$`potable` # predict with the new model on the tune data
 set.seed(1)
 
-thres_tune2 <- as.factor(ifelse(pred_tune2 > 0.4, "non_potable","potable"))  # compare the predictions to the 0.4 threshold
+thres_tune2 <- as.factor(ifelse(pred_tune2 > 0.4, "potable","non_potable"))  # compare the predictions to the 0.4 threshold
 
 eval2 <- confusionMatrix(as.factor(thres_tune2),   # evaluate the new predictions from the new model
                 as.factor(tune$Potability),
-                positive='non_potable',
+                positive='potable',
                 dnn=c("Prediction", "Actual"), 
                 mode = "everything")  # output all of the evaluation metric 
 
 eval2
 ```
 
-### Predict on the Test Set using the Final Model
+### Test another model
 
 ```{r}
 set.seed(1)
-pred_test = predict(new_mdl2, test, type= "prob")$`non_potable`  # predict with the second model on the test set 
+pred_test = predict(new_mdl2, test, type= "prob")$`potable`  # predict with the second model on the test set 
 
-thres_test <- as.factor(ifelse(pred_test > 0.4, "non_potable","potable"))  # compare the predictions to the 0.4 threshold
+thres_test <- as.factor(ifelse(pred_test > 0.4, "potable","non_potable"))  # compare the predictions to the 0.4 threshold
 
 set.seed(1)
 confusionMatrix(as.factor(thres_test),  # Use the confusion matrix to evaluate how the model performed on the test set 
                 as.factor(test$Potability), 
                 dnn=c("Prediction", "Actual"), 
-                positive='non_potable',
+                positive='potable',
                 mode = "everything")
 ```
 
