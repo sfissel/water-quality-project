@@ -1193,7 +1193,7 @@ predictandCM<- function(model,data,modeltype,ref)
 predictandCM(water_mdl1, tune, "raw", tune$Potability)
 water_pred_tune = predict(water_mdl1,tune,tune$Potability, type= "prob")
 water_pred_tune_labels = predict(water_mdl1,tune,tune$Potability,type = "raw")
-plot(density(water_pred_tune$potable))
+plot(density(water_pred_tune$non_potable))
 ```
 
 #### Second Model
@@ -1201,7 +1201,7 @@ plot(density(water_pred_tune$potable))
 predictandCM(water_mdl2, tune, "raw", tune$Potability) 
 water_pred_tune2 = predict(water_mdl2,tune,tune$Potability, type= "prob")
 water_pred_tune_labels2 = predict(water_mdl2,tune,tune$Potability,type = "raw")
-plot(density(water_pred_tune2$potable))
+plot(density(water_pred_tune2$non_potable))
 ```
 
 
@@ -1289,7 +1289,8 @@ tree_perf_AUC@y.values
 ### Another method to see if we make a better model using different method
 ```{r}
 # load the data
-water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")# data cleaning
+water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+# data cleaning
 water_quality <- water_quality[complete.cases(water_quality), ]
 # factorize
 water_quality$Potability <- as.factor(water_quality$Potability)
