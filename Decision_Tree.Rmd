@@ -222,7 +222,7 @@ adjust_thres <- function(x, y, z) {
   confusionMatrix(thres, z, positive = "potable", dnn=c("Prediction", "Actual"), mode = "everything")
 }
 
-adjust_thres(water_pred_tune2$potable,y=.6,tune$Potability)
+adjust_thres(water_pred_tune2$potable,y=.8,tune$Potability)
 ```
 
 ### ROC and AUC 

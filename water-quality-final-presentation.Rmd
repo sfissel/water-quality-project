@@ -17,7 +17,7 @@ runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(ggplot2)
 library(plotly)
 library(shiny)
@@ -1195,8 +1195,7 @@ water_pred_tune = predict(water_mdl1,tune,tune$Potability, type= "prob")
 water_pred_tune_labels = predict(water_mdl1,tune,tune$Potability,type = "raw")
 plot(density(water_pred_tune$potable))
 ```
-TN FN
-FP TP
+
 #### Second Model
 ```{r}
 predictandCM(water_mdl2, tune, "raw", tune$Potability) 

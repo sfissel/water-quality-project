@@ -404,6 +404,12 @@ table(water_quality$Potability)</code></pre>
 ##  $ Potability     : Factor w/ 2 levels &quot;non_potable&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...</code></pre>
 <pre class="r"><code>#glimpse(water_quality)</code></pre>
 </div>
+<div id="we-had-a-weird-issue-that-the-values-potable-and-non_potable-of-potability-variable-was-switched-even-though-we-labeled-them-correctly.-so-it-shows-the-swap-between-sensitivity-and-specificity.-but-the-correct-value-is-potable-1-and-non_potable-0." class="section level3">
+<h3>We had a weird issue that the values (potable and non_potable) of
+“Potability” variable was switched even though we labeled them
+correctly. So, it shows the swap between sensitivity and specificity.
+But, the correct value is potable = 1 and non_potable = 0.</h3>
+</div>
 <div id="splitting-the-data-with-tuning-and-test-creating-decision-trees" class="section level3">
 <h3>Splitting the data with tuning and test &amp; Creating Decision
 Trees</h3>
@@ -718,34 +724,34 @@ adjust_thres &lt;- function(x, y, z) {
   confusionMatrix(thres, z, positive = &quot;potable&quot;, dnn=c(&quot;Prediction&quot;, &quot;Actual&quot;), mode = &quot;everything&quot;)
 }
 
-adjust_thres(water_pred_tune2$potable,y=.6,tune$Potability)</code></pre>
+adjust_thres(water_pred_tune2$potable,y=.8,tune$Potability)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##              Actual
 ## Prediction    non_potable potable
-##   non_potable         116      68
-##   potable               4      13
+##   non_potable         120      76
+##   potable               0       5
 ##                                          
-##                Accuracy : 0.6418         
-##                  95% CI : (0.5713, 0.708)
+##                Accuracy : 0.6219         
+##                  95% CI : (0.551, 0.6892)
 ##     No Information Rate : 0.597          
-##     P-Value [Acc &gt; NIR] : 0.1103         
+##     P-Value [Acc &gt; NIR] : 0.2597         
 ##                                          
-##                   Kappa : 0.1459         
+##                   Kappa : 0.0728         
 ##                                          
-##  Mcnemar&#39;s Test P-Value : 1.131e-13      
+##  Mcnemar&#39;s Test P-Value : &lt;2e-16         
 ##                                          
-##             Sensitivity : 0.16049        
-##             Specificity : 0.96667        
-##          Pos Pred Value : 0.76471        
-##          Neg Pred Value : 0.63043        
-##               Precision : 0.76471        
-##                  Recall : 0.16049        
-##                      F1 : 0.26531        
+##             Sensitivity : 0.06173        
+##             Specificity : 1.00000        
+##          Pos Pred Value : 1.00000        
+##          Neg Pred Value : 0.61224        
+##               Precision : 1.00000        
+##                  Recall : 0.06173        
+##                      F1 : 0.11628        
 ##              Prevalence : 0.40299        
-##          Detection Rate : 0.06468        
-##    Detection Prevalence : 0.08458        
-##       Balanced Accuracy : 0.56358        
+##          Detection Rate : 0.02488        
+##    Detection Prevalence : 0.02488        
+##       Balanced Accuracy : 0.53086        
 ##                                          
 ##        &#39;Positive&#39; Class : potable        
 ## </code></pre>
@@ -769,6 +775,12 @@ tree_perf_AUC@y.values</code></pre>
 <pre><code>## [[1]]
 ## [1] 0.6326132</code></pre>
 </div>
+<div id="we-didnt-include-this-part-into-our-final-presentation-because-we-didnt-see-any-noticeable-change-in-statistics-accuracy-sensitivity-specificity" class="section level1">
+<h1>We didn’t include this part into our final presentation because we
+didn’t see any noticeable change in statistics (accuracy, sensitivity,
+specificity)</h1>
+<div id="please-consider-that-this-part-as-a-reference" class="section level2">
+<h2>Please consider that this part as a reference</h2>
 <div id="another-method-to-see-if-we-make-a-better-model-using-different-method" class="section level3">
 <h3>Another method to see if we make a better model using different
 method</h3>
@@ -1064,6 +1076,8 @@ eval2</code></pre>
 ##                                           
 ##        &#39;Positive&#39; Class : potable         
 ## </code></pre>
+</div>
+</div>
 </div>
 
 
