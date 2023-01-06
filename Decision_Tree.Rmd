@@ -53,7 +53,7 @@ water_quality$Potability <- fct_collapse(water_quality$Potability,
 table(water_quality$Potability)
 str(water_quality)
 
-glimpse(water_quality)
+#glimpse(water_quality)
 ```
 
 ### Splitting the data with tuning and test & Creating Decision Trees
@@ -78,10 +78,6 @@ tune_and_test_index <- createDataPartition(tune_and_test$Potability,
 
 tune <- tune_and_test[tune_and_test_index, ]
 test <- tune_and_test[-tune_and_test_index, ]
-
-#dim(train)
-#dim(test) 
-#dim(tune)
 
 # Build the model
 # Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
@@ -109,8 +105,9 @@ varImp(water_mdl1)
 rpart.plot(water_mdl1$finalModel, type=1,extra=101)
 water_mdl1 # maxdepth is 11
 
+dims <- data.frame("Train Size" = nrow(train), "Tune Size" = nrow(tune), "Test Size" = nrow(test))  # create a dataframe of the sizes of each set and output the dataframe
+dims
 ```
-
 
 #### Second Decision Tree Model
 ```{r}
@@ -157,7 +154,6 @@ predictandCM(water_mdl2, tune, "raw", tune$Potability)
 water_pred_tune2 = predict(water_mdl2,tune,tune$Potability, type= "prob")
 water_pred_tune_labels2 = predict(water_mdl2,tune,tune$Potability,type = "raw")
 plot(density(water_pred_tune2$potable))
-#View(as_tibble(water_pred_tune_labels))
 ```
 
 
@@ -198,11 +194,23 @@ water_eval <- caret::confusionMatrix(water_pred_tune_labels2,
                 dnn=c("Prediction", "Actual"),
                 positive="potable",
                 mode = "everything")
-#water_eval
+water_eval
+```
+```{r}
+# estimate the target variable.
+set.seed(777)  # set seed 
+pred_tune = predict(water_mdl2,tune)  # predict using the model on the tune set
+
+pred_tune_prob <- predict(water_mdl2,tune, tune, type = "prob")  # save the raw probabilities for each observation being in the positive or negative class
+
+probs_and_results <- cbind(pred_tune_prob, data.frame(`actual_potability`= tune$Potability))
+
+head(probs_and_results)
+
 ```
 
 ### Adjusting Threshold with the Second Decision Tree Model
-We were adjusting threshold between 0.2 and 0.8, then found 0.6 is a good point considering the balance of sensitivity and specificity. However, the accuracy of the model is still low, so we need to improve on our model and reduce the False Negative values.
+We were adjusting threshold between 0.2 and 0.8, then found 0.6 is a good point considering higher specificity.
 ```{r}
 # With the percentages you generated in step 10,select several different threshold levels using the threshold function we created and interpret the results. What patterns do you notice, did the evaluation metrics change?
 
@@ -215,8 +223,30 @@ adjust_thres <- function(x, y, z) {
 adjust_thres(water_pred_tune2$potable,y=.6,tune$Potability)
 ```
 
+### ROC and AUC 
 
-### Improve on the initial models
+```{r}
+# Generate a ROC and AUC output, interpret the results
+
+# Put predictions and targets in one table 
+pred_tune_tibble <- tibble(pred_class=pred_tune, pred_prob=pred_tune_prob$`potable`, target=as.numeric(tune$Potability))
+pred <- prediction(pred_tune_tibble$pred_prob, pred_tune_tibble$target) # use predicted prob and target at different threshold levels to build ROC curve
+
+ROC_perf <- performance(pred,"tpr","fpr") # prediction for True Positive Rate and False Positive Rate 
+# TPR = TP / (TP + FN)
+# FPR = FP / (FP + TN)
+ 
+plot(ROC_perf, colorize=TRUE) # plot ROC curve
+```
+
+
+```{r}
+tree_perf_AUC <- performance(pred,"auc")  # calculate auc on the predictions
+tree_perf_AUC@y.values
+```
+
+
+### Another method to see if we make a better model using different method
 ```{r}
 # load the data
 water_quality <- read.csv("~/Desktop/R/water-quality-project/water_potability.csv")
@@ -229,7 +259,6 @@ water_quality$Potability <- fct_collapse(water_quality$Potability,
                            non_potable = "0")
 
 ```
-
 
 
 ```{r}
@@ -251,9 +280,9 @@ tune_and_test_index <- createDataPartition(tune_and_test$Potability,
 tune <- tune_and_test[tune_and_test_index, ]
 test <- tune_and_test[-tune_and_test_index, ]
 
-#dim(train)
-#dim(test) 
-#dim(tune)
+dim(train)
+dim(test) 
+dim(tune)
 
 # Build the model
 # Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
@@ -332,24 +361,19 @@ eval
 ```
 
 ### ROC and AUC 
-
 ```{r}
 # Generate a ROC and AUC output, interpret the results
 
 # Put predictions and targets in one table 
 pred_tune_tibble <- tibble(pred_class=pred_tune, pred_prob=pred_tune_prob$`potable`, target=as.numeric(tune$Potability))
-#pred_tune_tibble2 <- tibble(pred_class=pred_tune, pred_prob=pred_tune_prob$`non_potable`, target=as.numeric(tune$Potability))
 
 pred <- prediction(pred_tune_tibble$pred_prob, pred_tune_tibble$target) # use predicted prob and target at different threshold levels to build ROC curve
-#pred2 <- prediction(pred_tune_tibble2$pred_prob, pred_tune_tibble$target)
+
 ROC_perf <- performance(pred,"tpr","fpr") # prediction for True Positive Rate and False Positive Rate 
 # TPR = TP / (TP + FN)
 # FPR = FP / (FP + TN)
-#ROC_perf2 <- performance(pred,"tnr","fnr") # prediction for True Negative Rate and False Positive Rate 
-
+ 
 plot(ROC_perf, colorize=TRUE) # plot ROC curve
-#plot(ROC_perf2, colorize=TRUE)
-
 ```
 
 
@@ -357,11 +381,8 @@ plot(ROC_perf, colorize=TRUE) # plot ROC curve
 tree_perf_AUC <- performance(pred,"auc")  # calculate auc on the predictions
 
 tree_perf_AUC@y.values
-
-#tree_perf_AUC <- performance(pred2,"auc")  # calculate auc on the predictions
-
-#tree_perf_AUC@y.values
 ```
+
 
 ### Evaluate Model with Different Hyper-Parameters
 
@@ -390,7 +411,7 @@ set.seed(777) # set seed for reproducibility
 pred_tune2 = predict(new_mdl2,tune, type= "prob")$`potable` # predict with the new model on the tune data
 set.seed(1)
 
-thres_tune2 <- as.factor(ifelse(pred_tune2 > 0.4, "potable","non_potable"))  # compare the predictions to the 0.4 threshold
+thres_tune2 <- as.factor(ifelse(pred_tune2 > 0.6, "potable","non_potable"))  # compare the predictions to the 0.4 threshold
 
 eval2 <- confusionMatrix(as.factor(thres_tune2),   # evaluate the new predictions from the new model
                 as.factor(tune$Potability),
@@ -400,23 +421,4 @@ eval2 <- confusionMatrix(as.factor(thres_tune2),   # evaluate the new prediction
 
 eval2
 ```
-
-### Test another model
-
-```{r}
-set.seed(1)
-pred_test = predict(new_mdl2, test, type= "prob")$`potable`  # predict with the second model on the test set 
-
-thres_test <- as.factor(ifelse(pred_test > 0.4, "potable","non_potable"))  # compare the predictions to the 0.4 threshold
-
-set.seed(1)
-confusionMatrix(as.factor(thres_test),  # Use the confusion matrix to evaluate how the model performed on the test set 
-                as.factor(test$Potability), 
-                dnn=c("Prediction", "Actual"), 
-                positive='potable',
-                mode = "everything")
-```
-
-
-
 
