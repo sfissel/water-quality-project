@@ -56,6 +56,8 @@ str(water_quality)
 #glimpse(water_quality)
 ```
 
+### We had a weird issue that the values (potable and non_potable) of "Potability" variable was switched even though we labeled them correctly. So, it shows the swap between sensitivity and specificity. But, the correct value is potable = 1 and non_potable = 0.  
+
 ### Splitting the data with tuning and test & Creating Decision Trees
 #### First Decision Tree Model
 ```{r}
@@ -245,7 +247,8 @@ tree_perf_AUC <- performance(pred,"auc")  # calculate auc on the predictions
 tree_perf_AUC@y.values
 ```
 
-
+# We didn't include this part into our final presentation because we didn't see any noticeable change in statistics (accuracy, sensitivity, specificity)
+## Please consider that this part as a reference
 ### Another method to see if we make a better model using different method
 ```{r}
 # load the data
