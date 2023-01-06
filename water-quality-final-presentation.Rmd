@@ -1,0 +1,1454 @@
+---
+title: "DS 4002: Water Quality Final Presentation"
+author: "Group 3: Stephanie Fissel, Beza Gashe, Claire Yoon"
+date: "January 6, 2023"
+output: 
+  html_document:
+    theme: yeti
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 3
+editor_options: 
+chunk_output_type: inline
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(plotly)
+library(shiny)
+library(shinyWidgets)
+library(tidyverse)
+library(aod)
+library(vtable)
+library(scales)
+library(reshape2)
+library(gridExtra)
+library(grid)
+library(cowplot)
+library(dplyr)
+library(data.table)
+library(e1071)
+library(htmltools)
+library(devtools)
+library(caret)
+library(NbClust)
+library(randomForest)
+library(rio)
+library(plyr)
+library(ROCR)
+library(rpart)
+library(psych)
+library(pROC)
+library(rpart.plot)
+library(rattle)
+library(class)
+library(MLmetrics)
+library(mltools)
+library(RColorBrewer)
+library(corrplot)
+```
+
+# **INTRODUCTION**
+## Problem
+Access to safe drinking water is essential to health and a basic human right, 
+though many developing countries and even parts of the U.S. like Flint, Michigan are living with 
+contaminated drinking water. With the increased prevalence of climate change, 
+drinking water is becoming even more negatively impacted by contaminants. In 
+these instances, non-potable drinking water containing unsafe levels of 
+contaminants can have serious adverse health effects, such as gastrointestinal 
+illnesses, cancer, and transmissible diseases. </br>
+
+There are various water quality metrics that may contribute to the potability of
+drinking water. We want to analyze and determine what metrics may more heavily 
+contribute to water being non-potable which could, in the real world, help 
+formulate effective policy for health protection through implementation of 
+systems that specifically de-contaminate the water of these substances. In some 
+regions, it has been shown that investments in water supply and sanitation can yield a new 
+economic benefit, since the reductions in adverse health effects and health care 
+costs outweigh the costs of undertaking the interventions. 
+
+## Questions
+* What is the distribution of each metric in regards to potable and non-potable water quality and can observations about water potability and selected metrics be made when other metrics are at varied levels?
+* How well can machine learning models accurately predict the non-potability of water?
+
+## Background Information
+Water quality describes the condition of water and thus, to what extent it is safe for humans to utilize at different capacities (drinking, swimming, etc.). Understanding the quality of the water we drink is an integral component to protecting our health as well as the health of the environment. Contaminated water has been the root of numerous global health-related crises and lack of access to clean water in America, for example, can be further explained by the current structural and systematic racism embedded within society. <br>
+
+771 million people (1 in 10) lack access to safe water. Approximately 829,000 individuals are predicted to die every year from diarrhea as a result of unsafe drinking water, poor hand hygiene, and poor sanitation. <br>
+
+Current challenges to water supply systems include population growth, climate change, increasing water scarcity, demographic changes, and urbanization. The increasing rate of population growth contributes to the increased scarcity of clean water as the global human population reached 8 million in mid-November 2022. Additionally, the growing prevalence of climate change around the world is also affecting water access by disrupting water patterns and through the emergence of extreme weather events. For example, hotter, drier mountains leach more metal into water sources from abandoned mines and natural deposits, causing more acidified and contaminated drinking water. <br>
+
+Reapplying this to the real world: <br>
+- The Flint Water Crisis was a prime example of how our past responses and interventions during crises have shaped our current local, global, and national relationships between societies and people in the U.S. <br>
+- Individuals and children in developing countries and low-income areas have to bear the burden of this crisis due to the avarices of those in positions of power. <br>
+- Improving and optimizing water quality is a collective responsibility to work towards improving water sources for disproportionate areas while also addressing and eradicating health and racial disparities for both small communities such as Flint Michigan, American society, and the world at large. <br>
+
+How water is cleaned: <br>
+- In the U.S., water from surface and ground sources are treated to levels that meet state and federal standards for consumption by disinfecting and filtering the water or by meeting specific criteria for avoiding filtration so specific contaminants are controlled at certain levels. <br>
+- The EPA established maximum contaminant levels for various contaminants [here](https://www.epa.gov/ground-water-and-drinking-water/national-primary-drinking-water-regulations). <br>
+- Water from natural sources is treated for microorganisms, bacteria, toxic chemicals, viruses, and fecal matter.
+
+
+# **EXPLORATORY DATA ANALYSIS**
+
+## Dataset
+
+#### ***[Water Quality](https://www.kaggle.com/datasets/adityakadiwal/water-potability?select=water_potability.csv)***
+A dataset containing water quality metrics for 3276 different water bodies. <br/>
+
+```{r}
+# READ IN DATASET:
+water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+```
+
+
+### Predictor Variables <br/>
+    
+* pH value
+    + acidic or alkaline condition
+* Hardness
+    + caused by calcium and magnesium salts
+* Solids (Total dissolved solids - TDS)
+   + mineralization of organic minerals or salts
+* Chloramines
+   + disinfectant (chlorine + ammonia = chloramines)
+* Sulfates
+   + naturally occurring substance present in minerals, soil, and rocks
+* Conductivity
+   + determined by amount of dissolved solids
+* Organic carbon
+   + carbon in decaying natural organic matter and synthetic sources
+* Trihalomethanes
+   + chemicals found in water treated with chlorine
+* Turbidity
+   + depends on quantity of solid matter present; measure of light emitting 
+   properties of water
+
+### Target Variable <br/>
+
+* Potability
+   + indicator of whether water is safe for human consumption where 1 = Potable (good water) 
+   and 0 = Not Potable (bad water)
+
+## Data Cleaning
+
+#### - Removed rows containing at least one NA
+#### - Converting 'Potability' to a factor (categorical variable)
+#### - Recoded the target variable to signify 1 as “Potable” and 0 as “Not Potable”
+
+### Initial Exploratory Data Analysis Visualizations
+#### Distribution of the data between potable and non-potable
+```{r}
+# Initial Data Cleaning
+water_quality <- na.omit(water_quality)
+water_quality$Potability <- factor(water_quality$Potability)
+# Find percentages
+np <- round(1998/3276 * 100)
+p <- round(1278/3276 * 100)
+# Subset test data
+data <- data.frame(
+  category=c("Non-Potable", "Potable"),
+  count=c(np, p)
+)
+# Compute percentages
+data$fraction = data$count / sum(data$count)
+# Compute the cumulative percentages (top of each rectangle)
+data$ymax = cumsum(data$fraction)
+# Compute the bottom of each rectangle
+data$ymin = c(0, head(data$ymax, n=-1))
+# Compute label position
+data$labelPosition <- (data$ymax + data$ymin) / 2
+# Compute a good label
+data$label <- paste0(data$category, ": ", data$count, "%")
+# Donut Chart
+ggplot(data, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=category)) +
+        geom_rect() +
+        geom_label( x=3.5, aes(y=labelPosition, label=label), size=5) +
+        scale_fill_manual(values = c("#E86363", "#63E871")) + 
+        coord_polar(theta="y") +
+        xlim(c(2, 4)) +
+        theme_void() +
+        theme(legend.position = "none")
+```
+
+#### Correlation Heatmap
+##### Visualizes that there is low correlation between predictor variables
+```{r}
+# Initial Data Cleaning
+water_quality <- na.omit(water_quality)
+var <- names(water_quality) %in% c("Potability")
+water_corr <- water_quality[!var]
+
+# Correlation Heatmap
+M <- cor(water_corr)
+corrplot(M, method="color", col=colorRampPalette(c("white", "lightblue", "darkblue"))(100), tl.col = "black")
+```
+
+
+# **METHODS**
+## Shiny App
+This app is an interactive way to further analyze the potability and non-potability of water according to different metrics in this dataset. Each water quality metric has its own tab in the app of its distribution that is connected to each of the metric slider inputs. The distributions are visualized through both a histogram and box plots that are divided by potability level with red as non-potable and green as potable. The recommended levels and thresholds for each metric are also included in order to clearly visualize how the distributions relate to normal health standards. Overall, these visualizations are meant to demonstrate the varying distribution levels of each metric and their potability considerations. The interactivity of the slider inputs was implemented into these distributions in order for one to test and see how a varied level of one or more metrics can impact other metric distributions.
+
+## Machine Learning
+Initially, we wanted to use more various methods including unsupervised methods such as clustering, but our target variable (Potability) on the dataset was preset with categorical variable (1 = potable, 0 = non_potable), so we were not able to identify correlations between predictor variables and the target variable. Therefore, given that condition, the best options for creating machine learning models were Random Forest method and Decision Tree method. Aligning to the original dataset which categorized “Potable” as “1” and “Not_Potable” as 0, we designated the positive class in these models as water being identified as “Potable.” 
+
+# **RESULTS & EVALUATION**
+
+## Interactive Shiny App
+
+```{r}
+# Remove all rows with NA values
+water_quality <- na.omit(water_quality)
+# Convert Potability into a factor
+water_quality$Potability <- factor(water_quality$Potability)
+
+# Create donut chart
+np <- round(1998/3276 * 100)
+p <- round(1278/3276 * 100)
+# Subset test data
+data <- data.frame(
+  category=c("Non-Potable", "Potable"),
+  count=c(np, p)
+)
+
+# Compute percentages
+data$fraction = data$count / sum(data$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+data$ymax = cumsum(data$fraction)
+
+# Compute the bottom of each rectangle
+data$ymin = c(0, head(data$ymax, n=-1))
+
+# Compute label position
+data$labelPosition <- (data$ymax + data$ymin) / 2
+
+# Compute a good label
+data$label <- paste0(data$category, ": ", data$count, "%")
+
+
+# Creating Shiny App
+shinyApp(
+  ui <- fluidPage(
+    # App title
+    titlePanel("METRIC DISTRIBUTIONS OF WATER POTABILITY"),
+    br(),
+    
+    #Add sidebar panel for metric slider inputs
+    sidebarPanel(
+      sliderInput("ph", "pH Level (pH):", min = 0, max = 14, value = c(0, 14), 
+                step = 1),
+      h6("Recommended Level: 6.5-8.5 pH (neutral on pH scale)"),
+      sliderInput("hardness", "Hardness Level (mg/L):", min = 50, max = 360, value = c(50, 360), 
+                step = 10),
+      h6("Recommended Level: None. Hardness levels > 150 mg/L are considered hard water. If water is hard, it can reduce efficiency of water treatment."),
+      sliderInput("solids", "Solids Level (mg/l):", min = 0, max = 50800, value = c(0, 50800), 
+                step = 1000),
+      h6("Recommended Level: 500-1000 mg/l"),
+      sliderInput("chloramines", "Chloramine Level (mg/L):", min = 0, max = 14, value = c(0, 14), 
+                step = 1),
+      h6("Recommended Level: 4 mg/L or less"),
+      sliderInput("sulfates", "Sulfate Level (mg/L):", min = 0, max = 500, value = c(0, 500), 
+                step = 50),
+      h6("Recommended Level: 250 mg/L or less"),
+      sliderInput("conductivity", "Conductivity Level (μS/cm):", min = 200, max = 800, value = c(200, 800), 
+                step = 100),
+      h6("Recommended Level: 400 μS/cm or less"),
+      sliderInput("organic_carbon", "Organic Carbon Level (mg/L):", min = 0, max = 30, value = c(0, 30), 
+                step = 1),
+      h6("Recommended Level: 2 mg/L or less"),
+      sliderInput("trihalomethanes", "Trihalomethanes (ppm):", min = 0, max = 125, value = c(0, 125), 
+                step = 10),
+      h6("Recommended Level: 80 ppm or less"),
+      sliderInput("turbidity", "Turbidity (NTU):", min = 0, max = 7, value = c(0, 7), 
+                step = 1),
+      h6("Recommended Level: 5 NTU or less"),
+      width = 4
+    ),
+    
+    mainPanel(
+      #Create tabs for each metric distribution
+      tabsetPanel(type = "tabs",
+                  tabPanel("Overall", plotOutput("overall"), width = "100%"),
+                  tabPanel("pH", plotOutput("ph")),
+                  tabPanel("Hardness", plotOutput("hardness")),
+                  tabPanel("Solids", plotOutput("solids")),
+                  tabPanel("Chloramines", plotOutput("chloramines")),
+                  tabPanel("Sulfates", plotOutput("sulfates")),
+                  tabPanel("Conductivity", plotOutput("conductivity")),
+                  tabPanel("Organic Carbon", plotOutput("organic_carbon")),
+                  tabPanel("Trihalomethanes", plotOutput("trihalomethanes")),
+                  tabPanel("Turbidity", plotOutput("turbidity")),
+                  ))
+    ),
+  
+  server <- function(input, output) {
+    
+    output$overall <- renderPlot({
+      #donut chart
+      ggplot(data, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=category)) +
+        geom_rect() +
+        geom_label( x=3.5, aes(y=labelPosition, label=label), size=5) +
+        scale_fill_manual(values = c("#E86363", "#63E871")) + 
+        coord_polar(theta="y") +
+        xlim(c(2, 4)) +
+        theme_void() +
+        theme(legend.position = "none")
+    }, height = 700, width = 900)
+    # pH distribution plot
+    output$ph <- renderPlot({
+       water_quality <- filter(water_quality,
+                              ph >= input$ph[1],
+                              ph <= input$ph[2])
+       water_quality <- filter(water_quality,
+                              Hardness >= input$hardness[1],
+                              Hardness <= input$hardness[2])
+       water_quality <- filter(water_quality,
+                              Solids >= input$solids[1],
+                              Solids <= input$solids[2])
+       water_quality <- filter(water_quality,
+                              Chloramines >= input$chloramines[1],
+                              Chloramines <= input$chloramines[2])
+       water_quality <- filter(water_quality,
+                              Sulfate >= input$sulfates[1],
+                              Sulfate <= input$sulfates[2])
+       water_quality <- filter(water_quality,
+                              Conductivity >= input$conductivity[1],
+                              Conductivity <= input$conductivity[2])
+       water_quality <- filter(water_quality,
+                              Organic_carbon >= input$organic_carbon[1],
+                              Organic_carbon <= input$organic_carbon[2])
+       water_quality <- filter(water_quality,
+                              Trihalomethanes >= input$trihalomethanes[1],
+                              Trihalomethanes <= input$trihalomethanes[2])
+       water_quality <- filter(water_quality,
+                              Turbidity >= input$turbidity[1],
+                              Turbidity <= input$turbidity[2])
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=ph)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=ph)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = ph, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 6.5, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        geom_vline(xintercept = 8.5, color = "darkslategrey", linetype = "dashed", size=0.3) +
+        labs(x = "pH Level (pH)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 5, y = 50, label = "< 6.5 is acidic") +
+        annotate("text", x = 10, y = 50, label = "> 8.5 is basic") + 
+        annotate("text", x = 7.5, y = 62, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 7.5, y = 60, label = "levels", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("pH Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+      })
+    #Hardness distribution plot  
+    output$hardness <- renderPlot({
+      water_quality <- filter(water_quality,
+                              ph >= input$ph[1],
+                              ph <= input$ph[2])
+       water_quality <- filter(water_quality,
+                              Hardness >= input$hardness[1],
+                              Hardness <= input$hardness[2])
+       water_quality <- filter(water_quality,
+                              Solids >= input$solids[1],
+                              Solids <= input$solids[2])
+       water_quality <- filter(water_quality,
+                              Chloramines >= input$chloramines[1],
+                              Chloramines <= input$chloramines[2])
+       water_quality <- filter(water_quality,
+                              Sulfate >= input$sulfates[1],
+                              Sulfate <= input$sulfates[2])
+       water_quality <- filter(water_quality,
+                              Conductivity >= input$conductivity[1],
+                              Conductivity <= input$conductivity[2])
+       water_quality <- filter(water_quality,
+                              Organic_carbon >= input$organic_carbon[1],
+                              Organic_carbon <= input$organic_carbon[2])
+       water_quality <- filter(water_quality,
+                              Trihalomethanes >= input$trihalomethanes[1],
+                              Trihalomethanes <= input$trihalomethanes[2])
+       water_quality <- filter(water_quality,
+                              Turbidity >= input$turbidity[1],
+                              Turbidity <= input$turbidity[2])
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Hardness)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Hardness)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Hardness, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 75, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        geom_vline(xintercept = 150, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        geom_vline(xintercept = 300, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Hardness Level (mg/L)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 75, y = 45, label = "< 75 is soft") +
+        annotate("text", x = 110, y = 50, label = "> 75 is moderately hard") +
+        annotate("text", x = 170, y = 50, label = "> 150 is hard") +
+        annotate("text", x = 305, y = 50, label = "> 300 is very hard")
+      
+      title <- ggdraw() + draw_label("Hardness Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    #solids distribution plot
+    output$solids <- renderPlot({
+      water_quality <- filter(water_quality,
+                              ph >= input$ph[1],
+                              ph <= input$ph[2])
+       water_quality <- filter(water_quality,
+                              Hardness >= input$hardness[1],
+                              Hardness <= input$hardness[2])
+       water_quality <- filter(water_quality,
+                              Solids >= input$solids[1],
+                              Solids <= input$solids[2])
+       water_quality <- filter(water_quality,
+                              Chloramines >= input$chloramines[1],
+                              Chloramines <= input$chloramines[2])
+       water_quality <- filter(water_quality,
+                              Sulfate >= input$sulfates[1],
+                              Sulfate <= input$sulfates[2])
+       water_quality <- filter(water_quality,
+                              Conductivity >= input$conductivity[1],
+                              Conductivity <= input$conductivity[2])
+       water_quality <- filter(water_quality,
+                              Organic_carbon >= input$organic_carbon[1],
+                              Organic_carbon <= input$organic_carbon[2])
+       water_quality <- filter(water_quality,
+                              Trihalomethanes >= input$trihalomethanes[1],
+                              Trihalomethanes <= input$trihalomethanes[2])
+       water_quality <- filter(water_quality,
+                              Turbidity >= input$turbidity[1],
+                              Turbidity <= input$turbidity[2])
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Solids)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Solids)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Solids, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 500, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        geom_vline(xintercept = 1000, color = "darkslategrey", linetype = "dashed", size=0.3) +
+        labs(x = "Solid Level (mg/l)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 6000, y = 50, label = "> 1000 is high") + 
+        annotate("text", x = 800, y = 62, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 800, y = 60, label = "levels", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Solid Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    #chloramine distribution plot
+    output$chloramines <- renderPlot({
+      water_quality <- filter(water_quality,
+                              ph >= input$ph[1],
+                              ph <= input$ph[2])
+       water_quality <- filter(water_quality,
+                              Hardness >= input$hardness[1],
+                              Hardness <= input$hardness[2])
+       water_quality <- filter(water_quality,
+                              Solids >= input$solids[1],
+                              Solids <= input$solids[2])
+       water_quality <- filter(water_quality,
+                              Chloramines >= input$chloramines[1],
+                              Chloramines <= input$chloramines[2])
+       water_quality <- filter(water_quality,
+                              Sulfate >= input$sulfates[1],
+                              Sulfate <= input$sulfates[2])
+       water_quality <- filter(water_quality,
+                              Conductivity >= input$conductivity[1],
+                              Conductivity <= input$conductivity[2])
+       water_quality <- filter(water_quality,
+                              Organic_carbon >= input$organic_carbon[1],
+                              Organic_carbon <= input$organic_carbon[2])
+       water_quality <- filter(water_quality,
+                              Trihalomethanes >= input$trihalomethanes[1],
+                              Trihalomethanes <= input$trihalomethanes[2])
+       water_quality <- filter(water_quality,
+                              Turbidity >= input$turbidity[1],
+                              Turbidity <= input$turbidity[2])
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Chloramines)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Chloramines)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Chloramines, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 4, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Chloramine Level (mg/L)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 4.8, y = 45, label = "> 4 is high") +
+        annotate("text", x = 4, y = 55, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 4, y = 53, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Chloramine Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    #sulfate distribution plot
+    output$sulfates <- renderPlot({
+      water_quality <- filter(water_quality,
+                              ph >= input$ph[1],
+                              ph <= input$ph[2])
+       water_quality <- filter(water_quality,
+                              Hardness >= input$hardness[1],
+                              Hardness <= input$hardness[2])
+       water_quality <- filter(water_quality,
+                              Solids >= input$solids[1],
+                              Solids <= input$solids[2])
+       water_quality <- filter(water_quality,
+                              Chloramines >= input$chloramines[1],
+                              Chloramines <= input$chloramines[2])
+       water_quality <- filter(water_quality,
+                              Sulfate >= input$sulfates[1],
+                              Sulfate <= input$sulfates[2])
+       water_quality <- filter(water_quality,
+                              Conductivity >= input$conductivity[1],
+                              Conductivity <= input$conductivity[2])
+       water_quality <- filter(water_quality,
+                              Organic_carbon >= input$organic_carbon[1],
+                              Organic_carbon <= input$organic_carbon[2])
+       water_quality <- filter(water_quality,
+                              Trihalomethanes >= input$trihalomethanes[1],
+                              Trihalomethanes <= input$trihalomethanes[2])
+       water_quality <- filter(water_quality,
+                              Turbidity >= input$turbidity[1],
+                              Turbidity <= input$turbidity[2])
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Sulfate)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Sulfate)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Sulfate, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 250, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Sulfate Level (mg/L)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.92, 0.5)) + 
+        annotate("text", x = 275, y = 50, label = "> 250 is high") +
+        annotate("text", x = 250, y = 38, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 250, y = 36, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Sulfate Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    #conductivity distribution plot
+    output$conductivity <- renderPlot({
+      water_quality <- filter(water_quality,
+                              ph >= input$ph[1],
+                              ph <= input$ph[2])
+       water_quality <- filter(water_quality,
+                              Hardness >= input$hardness[1],
+                              Hardness <= input$hardness[2])
+       water_quality <- filter(water_quality,
+                              Solids >= input$solids[1],
+                              Solids <= input$solids[2])
+       water_quality <- filter(water_quality,
+                              Chloramines >= input$chloramines[1],
+                              Chloramines <= input$chloramines[2])
+       water_quality <- filter(water_quality,
+                              Sulfate >= input$sulfates[1],
+                              Sulfate <= input$sulfates[2])
+       water_quality <- filter(water_quality,
+                              Conductivity >= input$conductivity[1],
+                              Conductivity <= input$conductivity[2])
+       water_quality <- filter(water_quality,
+                              Organic_carbon >= input$organic_carbon[1],
+                              Organic_carbon <= input$organic_carbon[2])
+       water_quality <- filter(water_quality,
+                              Trihalomethanes >= input$trihalomethanes[1],
+                              Trihalomethanes <= input$trihalomethanes[2])
+       water_quality <- filter(water_quality,
+                              Turbidity >= input$turbidity[1],
+                              Turbidity <= input$turbidity[2])
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Conductivity)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(Conductivity)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Conductivity, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 400, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Conductivity Level (μS/cm)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 460, y = 42, label = "> 400 is high") +
+        annotate("text", x = 400, y = 47, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 400, y = 45, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Conductivity Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    #organic carbon distribution plot
+    output$organic_carbon <- renderPlot({
+      water_quality <- filter(water_quality,
+                              ph >= input$ph[1],
+                              ph <= input$ph[2])
+       water_quality <- filter(water_quality,
+                              Hardness >= input$hardness[1],
+                              Hardness <= input$hardness[2])
+       water_quality <- filter(water_quality,
+                              Solids >= input$solids[1],
+                              Solids <= input$solids[2])
+       water_quality <- filter(water_quality,
+                              Chloramines >= input$chloramines[1],
+                              Chloramines <= input$chloramines[2])
+       water_quality <- filter(water_quality,
+                              Sulfate >= input$sulfates[1],
+                              Sulfate <= input$sulfates[2])
+       water_quality <- filter(water_quality,
+                              Conductivity >= input$conductivity[1],
+                              Conductivity <= input$conductivity[2])
+       water_quality <- filter(water_quality,
+                              Organic_carbon >= input$organic_carbon[1],
+                              Organic_carbon <= input$organic_carbon[2])
+       water_quality <- filter(water_quality,
+                              Trihalomethanes >= input$trihalomethanes[1],
+                              Trihalomethanes <= input$trihalomethanes[2])
+       water_quality <- filter(water_quality,
+                              Turbidity >= input$turbidity[1],
+                              Turbidity <= input$turbidity[2])
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Organic_carbon)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Organic_carbon)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Organic_carbon, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 2, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Organic Carbon Level (mg/L)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 4, y = 35, label = "> 2 is high") + 
+        annotate("text", x = 2.5, y = 43, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 2.5, y = 41, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Organic Carbon Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    #trihalomethanes distribution plot
+    output$trihalomethanes <- renderPlot({
+      water_quality <- filter(water_quality,
+                              ph >= input$ph[1],
+                              ph <= input$ph[2])
+       water_quality <- filter(water_quality,
+                              Hardness >= input$hardness[1],
+                              Hardness <= input$hardness[2])
+       water_quality <- filter(water_quality,
+                              Solids >= input$solids[1],
+                              Solids <= input$solids[2])
+       water_quality <- filter(water_quality,
+                              Chloramines >= input$chloramines[1],
+                              Chloramines <= input$chloramines[2])
+       water_quality <- filter(water_quality,
+                              Sulfate >= input$sulfates[1],
+                              Sulfate <= input$sulfates[2])
+       water_quality <- filter(water_quality,
+                              Conductivity >= input$conductivity[1],
+                              Conductivity <= input$conductivity[2])
+       water_quality <- filter(water_quality,
+                              Organic_carbon >= input$organic_carbon[1],
+                              Organic_carbon <= input$organic_carbon[2])
+       water_quality <- filter(water_quality,
+                              Trihalomethanes >= input$trihalomethanes[1],
+                              Trihalomethanes <= input$trihalomethanes[2])
+       water_quality <- filter(water_quality,
+                              Turbidity >= input$turbidity[1],
+                              Turbidity <= input$turbidity[2])
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Trihalomethanes)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Trihalomethanes)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Trihalomethanes, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 80, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Trihalomethanes Level (ppm)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 90, y = 40, label = "> 80 is high") +
+        annotate("text", x = 80, y = 47, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 80, y = 45, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Trihalomethanes Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    #turbidity distribution plot
+    output$turbidity <- renderPlot({
+      water_quality <- filter(water_quality,
+                              ph >= input$ph[1],
+                              ph <= input$ph[2])
+       water_quality <- filter(water_quality,
+                              Hardness >= input$hardness[1],
+                              Hardness <= input$hardness[2])
+       water_quality <- filter(water_quality,
+                              Solids >= input$solids[1],
+                              Solids <= input$solids[2])
+       water_quality <- filter(water_quality,
+                              Chloramines >= input$chloramines[1],
+                              Chloramines <= input$chloramines[2])
+       water_quality <- filter(water_quality,
+                              Sulfate >= input$sulfates[1],
+                              Sulfate <= input$sulfates[2])
+       water_quality <- filter(water_quality,
+                              Conductivity >= input$conductivity[1],
+                              Conductivity <= input$conductivity[2])
+       water_quality <- filter(water_quality,
+                              Organic_carbon >= input$organic_carbon[1],
+                              Organic_carbon <= input$organic_carbon[2])
+       water_quality <- filter(water_quality,
+                              Trihalomethanes >= input$trihalomethanes[1],
+                              Trihalomethanes <= input$trihalomethanes[2])
+       water_quality <- filter(water_quality,
+                              Turbidity >= input$turbidity[1],
+                              Turbidity <= input$turbidity[2])
+      
+      nf <- layout( matrix(c(1,2), ncol=1))
+      par(mar=c(0, 3.1, 1.1, 2.1))
+      
+      p1_1 <- ggplot(subset(water_quality, Potability %in% c("0")), aes(x=Turbidity)) +
+        geom_boxplot(fill="#E86363", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      p1_2 <- ggplot(subset(water_quality, Potability %in% c("1")), aes(x=Turbidity)) +
+        geom_boxplot(fill="#63E871", alpha=0.7) +
+        labs(x = " ") +
+        theme_bw() +
+        theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(), axis.text.x = element_blank(),
+              axis.text.y = element_blank(), axis.ticks.x = element_blank(), 
+              axis.ticks.y = element_blank())
+      
+      par(mar=c(4, 3.1, 1.1, 2.1))
+      
+      p2 <- ggplot(water_quality, aes(x = Turbidity, color = Potability, fill=Potability)) + 
+        geom_histogram(position= "identity", alpha = 0.4, bins=100) +
+        scale_color_manual(values=c("#E86363", "#63E871"), guide = "none") +
+        scale_fill_manual(values=c("#E86363", "#63E871"), labels = c("Non-Potable", "Potable")) +
+        geom_vline(xintercept = 5, color = "darkslategrey", linetype = "dashed", size=0.3) + 
+        labs(x = "Turbidity Level (NTU)", y = "Count") + 
+        theme(text=element_text(size=15, family = "Helvetica"), legend.position=c(0.85, 0.5)) + 
+        annotate("text", x = 5.4, y = 37, label = "> 5 is high") +
+        annotate("text", x = 5, y = 45, label = "recommended", size=3.2, color="darkslategrey") +
+        annotate("text", x = 5, y = 43, label = "threshold", size=3.2, color="darkslategrey")
+      
+      title <- ggdraw() + draw_label("Turbidity Level Distribution", fontface='bold', size=20)
+      plot_grid(title, p1_1, p1_2, p2, ncol=1, align="v", rel_heights = c(0.6, 0.8, 0.8, 6))
+    })
+    
+    })
+```
+
+## Random Forest
+
+#Load the Data
+```{r}
+# READ IN DATASET:
+water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+```
+
+
+#Data Prep
+```{r}
+dim(water_quality) #10 columns, 3276 rows
+sum(is.na(water_quality)) #1434 missing values
+colSums(is.na(water_quality))#?colSums
+#missing values found in ph, sulfate, and trihalomethanes
+#Delete missing values
+water_quality <- water_quality[complete.cases(water_quality),]
+sum(is.na(water_quality))
+str(water_quality)
+head(water_quality)
+#converting target variable, potability to a factor:
+water_quality$Potability <- factor(water_quality$Potability)
+str(water_quality)
+```
+
+#No need to standardize the data
+
+#prevalence
+```{r}
+water_quality1<-names(select_if(water_quality, is.factor))
+water_quality1
+str(water_quality)
+table(water_quality$Potability)[2]/sum(table(water_quality$Potability))
+#prevalence=0.40
+water_quality$Potability <- recode(water_quality$Potability, 
+                           '0' = 'Non_Potable', 
+                            '1' = 'Potable')
+```
+
+#test, tune and training sets 
+```{r}
+set.seed(1999)
+part_index_1 <- caret::createDataPartition(water_quality$Potability,
+                                           times=1,
+                                           p = 0.80,
+                                           groups=1,
+                                           list=FALSE)
+train <- water_quality[part_index_1, ]
+tune_and_test <- water_quality[-part_index_1, ]
+train
+tune_and_test_index <- createDataPartition(water_quality$Potability,
+                                           p = .1,
+                                           list = FALSE,
+                                           times = 1)
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+dim(train)
+#1609  14
+dim(test)
+#367   14
+dim(tune)
+#202  14
+```
+
+
+#Calculating initial mtry level 
+```{r}
+water_quality_tune <- function(x){
+  water_quality <- dim(x)[2]-1
+  sqrt(water_quality)
+}
+water_quality_tune(water_quality)
+# = 3
+```
+
+
+#Running initial RF model with 1000 trees
+```{r}
+water_quality_RF = randomForest(as.factor(Potability)~.,          
+                            train,     
+                            ntree = 1000,  
+                            mtry = 3, 
+                            replace = TRUE,      
+                            sampsize = 100,      
+                            nodesize = 5,        
+                            
+                            importance = TRUE,   
+                           
+                            proximity = FALSE, 
+                            norm.votes = TRUE,
+                            do.trace = TRUE,     
+                            keep.forest = TRUE, 
+                            keep.inbag = TRUE)  
+#View(water_quality_RF)
+```
+
+
+#variable importance
+```{r}
+set.seed(1)
+varImp(water_quality_RF) 
+```
+ 
+
+#Using the training and tune datasets to tune the model in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output.
+```{r}
+#### Optimize the random forest model ####
+set.seed(1984)	
+water_quality_RF_2 = randomForest(as.factor(Potability)~.,          #<- 
+                              train,    
+                              ntree = 5000,     
+                              mtry = 6,          
+                              replace = TRUE,   
+                              sampsize = 200,    
+                              nodesize = 8, 
+                              importance = TRUE,  
+                              proximity = FALSE, 
+                              norm.votes = TRUE, 
+                              do.trace = TRUE, 
+                              keep.forest = TRUE, 
+                              keep.inbag = TRUE) 
+```
+
+
+#evaluate model using the test dataset. 
+```{r}
+water_quality_predict = predict(water_quality_RF_2,      #<- a randomForest model
+                            test,      #<- the test data set to use
+                            type = "response",   #<- what results to produce, see the help menu for the options
+                            predict.all = TRUE)
+str(water_quality_predict)
+water_quality_RF_2$confusion
+water_quality_RF$confusion
+library(caret)
+confusionMatrix(as.factor(water_quality_predict$aggregate),as.factor(test$Potability),positive = "Potable", 
+                dnn=c("Prediction", "Actual"), mode = "everything")
+```
+
+
+#visualize the random forest/accuracy/error rate
+```{r}
+#calling up criteria for random forest:
+water_quality_RF$call
+water_quality_RF$confusion
+water_quality_acc = sum(water_quality_RF$confusion[row(water_quality_RF$confusion) == 
+                    col(water_quality_RF$confusion)]) /sum(water_quality_RF$confusion)
+#checking accuracy of model
+water_quality_acc
+#error rate
+#View(as.data.frame(water_quality_RF$err.rate))
+err.rate <- as.data.frame(water_quality_RF$err.rate)
+#View(err.rate)
+# The "oob.times" argument includes the number of times that each data point is not excluded from trees in the random forest.
+#View(as.data.frame(water_quality_RF$oob.times))
+rf_density <- density(water_quality_RF$oob.times)
+plot(rf_density)
+```
+
+#visualize the plot
+```{r}
+water_quality_RF_error = data.frame(1:nrow(water_quality_RF$err.rate),
+                                water_quality_RF$err.rate)
+colnames(water_quality_RF_error) = c("Number of Trees", "Out of the Box",
+                                 "Potable", "Non_Potable")
+water_quality_RF_error$Diff <- water_quality_RF_error$Potable-water_quality_RF_error$`Non_Potable`
+#View(water_quality_RF_error)
+library(plotly)
+rm(fig)
+fig <- plot_ly(x=water_quality_RF_error$`Number of Trees`, y=water_quality_RF_error$Diff,name="Diff", type = 'scatter', mode = 'lines')
+fig <- fig %>% add_trace(y=water_quality_RF_error$`Out of the Box`, name="OOB_Er")
+fig <- fig %>% add_trace(y=water_quality_RF_error$`Potable`, name="Potable")
+fig <- fig %>% add_trace(y=water_quality_RF_error$`Non_Potable`, name="Non_Potable")
+fig
+```
+
+## Decision Tree
+
+#### Read in the data
+```{r}
+water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")
+```
+
+### Clean the data
+There were 1/3 missing values in Sulfate variable, but we didn’t delete it because sulfate showed one of the crucial factors for predicting non-potability because it leads to diarrhea and some problems. After handling with the missing values, we have 2011 objects.
+```{r}
+water_quality <- water_quality[complete.cases(water_quality), ]
+#dim(water_quality)
+```
+
+### Rename and factorize the 'Potability' variable
+We renamed the categorical values (1 and 0) to "potable" and "non_potable" </br>
+```{r}
+water_quality$Potability <- as.factor(water_quality$Potability)
+water_quality$Potability <- fct_collapse(water_quality$Potability, 
+                           potable = "1",
+                           non_potable = "0")
+table(water_quality$Potability)
+str(water_quality)
+#glimpse(water_quality)
+```
+
+### We had a weird issue that the values (potable and non_potable) of "Potability" variable was switched even though we labeled them correctly. So, it shows the swap between sensitivity and specificity. But, the correct value is potable = 1 and non_potable = 0.  
+
+### Splitting the data with tuning and test & Creating Decision Trees
+#### First Decision Tree Model
+```{r}
+#We do not need to check for correlated variables because correlation does not impact decision trees.
+#Decision trees make greedy, localized decisions that are not dependent on previous steps or other variables in the tree model.  
+set.seed(777)
+partition <- caret::createDataPartition(water_quality$Potability,
+                                           times=1,
+                                           p = 0.80,
+                                           groups=1,
+                                           list=FALSE)
+train <- water_quality[partition, ]
+tune_and_test <- water_quality[-partition, ]
+#train
+tune_and_test_index <- createDataPartition(tune_and_test$Potability,
+                                           p = .5,
+                                           list = FALSE,
+                                           times = 1)
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+# Build the model
+# Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
+#str(water_quality)
+features <- train[,-10] # dropping the target variable
+target <- train$Potability
+#str(features)
+#str(target)
+fitControl <- trainControl(method = "repeatedcv",
+                          number = 10,
+                          repeats = 5,
+                          classProbs = TRUE,
+                          summaryFunction = twoClassSummary) 
+# Train the model without setting tree grid
+set.seed(777)
+water_mdl1 <- train(x=features,
+                y=target,
+                method="rpart2",
+                trControl=fitControl,
+                metric="ROC")
+plot(water_mdl1)
+varImp(water_mdl1)
+rpart.plot(water_mdl1$finalModel, type=1,extra=101)
+water_mdl1 # maxdepth is 11
+dims <- data.frame("Train Size" = nrow(train), "Tune Size" = nrow(tune), "Test Size" = nrow(test))  # create a dataframe of the sizes of each set and output the dataframe
+dims
+```
+
+#### Second Decision Tree Model
+```{r}
+# Train the model
+tree.grid <- expand.grid(maxdepth=c(1:6))
+set.seed(777)
+water_mdl2 <- train(x=features,
+                y=target,
+                method="rpart2",
+                trControl=fitControl,
+                tuneGrid=tree.grid,
+                metric="ROC")
+plot(water_mdl2)
+varImp(water_mdl2)
+rpart.plot(water_mdl2$finalModel, type=1,extra=101)
+water_mdl2 # maxdepth is 6
+```
+
+
+### Confusion Matrix, Statistics, and Density Plot on Two Decision Trees
+#### First Model
+
+```{r}
+predictandCM<- function(model,data,modeltype,ref)
+{
+  pred <-predict(model,data,type=modeltype)
+  confusionMatrix(pred, reference=ref, positive = 'potable')
+}
+predictandCM(water_mdl1, tune, "raw", tune$Potability)
+water_pred_tune = predict(water_mdl1,tune,tune$Potability, type= "prob")
+water_pred_tune_labels = predict(water_mdl1,tune,tune$Potability,type = "raw")
+plot(density(water_pred_tune$potable))
+```
+TN FN
+FP TP
+#### Second Model
+```{r}
+predictandCM(water_mdl2, tune, "raw", tune$Potability) 
+water_pred_tune2 = predict(water_mdl2,tune,tune$Potability, type= "prob")
+water_pred_tune_labels2 = predict(water_mdl2,tune,tune$Potability,type = "raw")
+plot(density(water_pred_tune2$potable))
+```
+
+
+### Understanding Confusion Matrix
+True Positive(TP): Potable water correctly identified as potable </br>
+- Predicted condition: potable </br>
+- Actual condition: potable </br>
+</br>
+False Positive(FP): Non potable water incorrectly identified as potable </br>
+- Predicted condition: non-potable </br>
+- Actual condition: potable </br>
+</br>
+False Negative(FN): Potable water incorrectly identified as non-potable </br>
+- Predicted condition: non-potable </br>
+- Actual condition: potable </br>
+<br>
+True Negative(TN): Non potable water correctly identified as non-potable </br>
+- Predicted condition: non-potable </br>
+- Actual condition: non-potable </br>
+</br>
+
+Considering the real world situation, False Negative does not cause detrimental effects because people do not drink water if it is identified as non-potable even though it is actually potable. However, the opposite case (False Positive) will cause significant problems (people will be sick), so we need to make sure to reduce the number of False Positive and the model should be reliable.
+
+### Sensitivity & Specificity
+Sensitivity = number of true positives / (number of true positives + number of false negatives) </br>
+= number of correctly identified as potable water / total number of potable water
+
+Specificity = number of true negatives / (total number of true negatives + number of false positives) </br>
+= number of correctly identified as non-potable water / total number of non-potable water
+</br>
+Our goal is to reduce the number of False Positive and get higher Specificity
+
+```{r}
+# Use the the confusion matrix function on your predictions to check a variety of metrics and comment on the metric that might be best for this type of analysis given your question.  
+water_eval <- caret::confusionMatrix(water_pred_tune_labels2, 
+                as.factor(tune$Potability), 
+                dnn=c("Prediction", "Actual"),
+                positive="potable",
+                mode = "everything")
+water_eval
+```
+```{r}
+# estimate the target variable.
+set.seed(777)  # set seed 
+pred_tune = predict(water_mdl2,tune)  # predict using the model on the tune set
+pred_tune_prob <- predict(water_mdl2,tune, tune, type = "prob")  # save the raw probabilities for each observation being in the positive or negative class
+probs_and_results <- cbind(pred_tune_prob, data.frame(`actual_potability`= tune$Potability))
+head(probs_and_results)
+```
+
+### Adjusting Threshold with the Second Decision Tree Model
+We were adjusting threshold between 0.2 and 0.8, then found 0.6 is a good point considering higher specificity.
+```{r}
+# With the percentages you generated in step 10,select several different threshold levels using the threshold function we created and interpret the results. What patterns do you notice, did the evaluation metrics change?
+adjust_thres <- function(x, y, z) {
+  #x=pred_probablities, y=threshold, z=tune_outcome
+  thres <- as.factor(ifelse(x > y, "potable","non_potable"))
+  confusionMatrix(thres, z, positive = "potable", dnn=c("Prediction", "Actual"), mode = "everything")
+}
+adjust_thres(water_pred_tune2$potable,y=.6,tune$Potability)
+```
+
+### ROC and AUC 
+
+```{r}
+# Generate a ROC and AUC output, interpret the results
+# Put predictions and targets in one table 
+pred_tune_tibble <- tibble(pred_class=pred_tune, pred_prob=pred_tune_prob$`potable`, target=as.numeric(tune$Potability))
+pred <- prediction(pred_tune_tibble$pred_prob, pred_tune_tibble$target) # use predicted prob and target at different threshold levels to build ROC curve
+ROC_perf <- performance(pred,"tpr","fpr") # prediction for True Positive Rate and False Positive Rate 
+# TPR = TP / (TP + FN)
+# FPR = FP / (FP + TN)
+ 
+plot(ROC_perf, colorize=TRUE) # plot ROC curve
+```
+
+
+```{r}
+tree_perf_AUC <- performance(pred,"auc")  # calculate auc on the predictions
+tree_perf_AUC@y.values
+```
+
+# We didn't include this part into our final presentation because we didn't see any noticeable change in statistics (accuracy, sensitivity, specificity)
+## Please consider that this part as a reference
+### Another method to see if we make a better model using different method
+```{r}
+# load the data
+water_quality <- read.csv("/Users/stephaniefissel/Library/Mobile Documents/com~apple~CloudDocs/ds final project/water_potability.csv")# data cleaning
+water_quality <- water_quality[complete.cases(water_quality), ]
+# factorize
+water_quality$Potability <- as.factor(water_quality$Potability)
+water_quality$Potability <- fct_collapse(water_quality$Potability, 
+                           potable = "1",
+                           non_potable = "0")
+```
+
+
+```{r}
+set.seed(777)
+partition <- caret::createDataPartition(water_quality$Potability,
+                                           times=1,
+                                           p = 0.80,
+                                           groups=1,
+                                           list=FALSE)
+train <- water_quality[partition, ]
+tune_and_test <- water_quality[-partition, ]
+#train
+tune_and_test_index <- createDataPartition(tune_and_test$Potability,
+                                           p = .5,
+                                           list = FALSE,
+                                           times = 1)
+tune <- tune_and_test[tune_and_test_index, ]
+test <- tune_and_test[-tune_and_test_index, ]
+dim(train)
+dim(test) 
+dim(tune)
+# Build the model
+# Choose the features and classes, slightly different approach for caret, need to create features and target sets from the training data.
+features <- train[,-10] # dropping the target variable
+target <- train$Potability
+fitControl <- trainControl(method = "repeatedcv",
+                          number = 10,
+                          repeats = 5,
+                          returnResamp = "all",
+                          classProbs = TRUE,
+                          allowParallel = TRUE,
+                          summaryFunction = twoClassSummary) 
+grid <- expand.grid(.winnow = c(TRUE,FALSE), # try with reducing the feature space and without
+                    .trials=c(1,5,10,15,20), # number of boosting iterations to try
+                    .model="tree")  # use a decision tree model
+set.seed(777)  # set seed for reproducibility
+new_mdl <- train(x=features,  # train the model with the features to predict the target, salary
+                y=target,
+                method="C5.0",  # use C5.0 model that works by splitting the tree based on maximum info gain
+                tuneGrid=grid,
+                trControl=fitControl,
+                verbose=TRUE)
+new_mdl
+varImp(new_mdl)
+plot(new_mdl)
+predictandCM(new_mdl, tune, "raw", tune$Potability)
+water_pred_tune = predict(new_mdl,tune,tune$Potability, type= "prob")
+water_pred_tune_labels = predict(new_mdl,tune,tune$Potability,type = "raw")
+#plot(density(water_pred_tune$non_potable))
+```
+
+
+```{r}
+# visualize the re-sample distributions with different winnows and trials
+xyplot(new_mdl,type = c("g", "p", "smooth"))
+```
+
+```{r}
+# estimate the target variable.
+set.seed(777)  # set seed 
+pred_tune = predict(new_mdl,tune)  # predict using the model on the tune set
+pred_tune_prob <- predict(new_mdl,tune, tune, type = "prob")  # save the raw probabilities for each observation being in the positive or negative class
+probs_and_results <- cbind(pred_tune_prob, data.frame(`actual_potability`= tune$Potability))
+head(probs_and_results)
+```
+
+### Predicted vs. Actual Target Matrix
+```{r}
+table(as.factor(pred_tune), as.factor(tune$Potability))
+```
+
+
+### Confusion Matrix with Model on Tune Set
+```{r}
+# Use the the confusion matrix function to check a variety of metrics 
+# and comment on the metric that might be best for this type of analysis given your question.  
+set.seed(777) 
+eval <- confusionMatrix(as.factor(pred_tune),   # confusion matrix on the predictions and actual values 
+                as.factor(tune$Potability),
+                positive='potable',  # assign the positive class 
+                dnn=c("Prediction", "Actual"), 
+                mode = "everything")  # output all evaluation metrics 
+eval
+```
+
+### ROC and AUC 
+```{r}
+# Generate a ROC and AUC output, interpret the results
+# Put predictions and targets in one table 
+pred_tune_tibble <- tibble(pred_class=pred_tune, pred_prob=pred_tune_prob$`potable`, target=as.numeric(tune$Potability))
+pred <- prediction(pred_tune_tibble$pred_prob, pred_tune_tibble$target) # use predicted prob and target at different threshold levels to build ROC curve
+ROC_perf <- performance(pred,"tpr","fpr") # prediction for True Positive Rate and False Positive Rate 
+# TPR = TP / (TP + FN)
+# FPR = FP / (FP + TN)
+ 
+plot(ROC_perf, colorize=TRUE) # plot ROC curve
+```
+
+
+```{r}
+tree_perf_AUC <- performance(pred,"auc")  # calculate auc on the predictions
+tree_perf_AUC@y.values
+```
+
+
+### Evaluate Model with Different Hyper-Parameters
+
+```{r}
+fitControl2 <- trainControl(method = "LGOCV",  # Use leave group out cross validation with 5 folds
+                          number = 5,
+                          returnResamp="all",
+                          classProbs = TRUE,
+                          allowParallel = TRUE) 
+grid2 <- expand.grid(.winnow = c(TRUE,FALSE), # try with reducing the feature space and without
+                    .trials=c(1,5,10,15,20,25,30,40),   # number of boosting iterations to try - add greater values
+                    .model="tree") # use a decision tree model
+set.seed(777)  # set seed for reproducibility
+new_mdl2 <- train(x=features,  # train the model again with the new hyper-parameters
+                y=target,
+                method="C5.0",
+                tuneGrid=grid2,
+                trControl=fitControl2,
+                verbose=TRUE)
+set.seed(777) # set seed for reproducibility
+pred_tune2 = predict(new_mdl2,tune, type= "prob")$`potable` # predict with the new model on the tune data
+set.seed(1)
+thres_tune2 <- as.factor(ifelse(pred_tune2 > 0.6, "potable","non_potable"))  # compare the predictions to the 0.4 threshold
+eval2 <- confusionMatrix(as.factor(thres_tune2),   # evaluate the new predictions from the new model
+                as.factor(tune$Potability),
+                positive='potable',
+                dnn=c("Prediction", "Actual"), 
+                mode = "everything")  # output all of the evaluation metric 
+eval2
+```
+
+
+# **CONCLUSIONS**
+We were trying to increase the accuracy of models on Decision Tree and Random Forest. Given that the accuracy of the model only reached 66%, the accuracy we were able to reach was around 64% through the Decision Tree model. As our question focused on Non-Potability and creating a model to predict when water is non-potable or in other words, unsafe, we aimed to optimize our models to reduce the False Positive Rate as reflected in the matrix. Specifically, the FP rate suggests that the model predicts the water to be potable when it is actually non-potable. For the decision tree, we tried different methods such as C5.0 and LGOCV (Leave Group Out Cross Validation) besides rpart2, but the best fit was the rpart2 method considering the overall quality of the model. 
+
+# **FUTURE WORK**
+* Do more research involving geographical data to implement as another factor of water quality (climate change, agriculture, etc.)
+* Improve the model to better predict water as potable and increase the overall accuracy
+* Figure out how to connect the shiny app to the existing machine learning models
+* Look at a bigger size of data or any related data that we can combine/merge so that allows us to train the models and predict with better accuracy
+
+# **SOURCES**
+* https://www.kaggle.com/datasets/adityakadiwal/water-potability
+* https://www.who.int/news-room/fact-sheets/detail/drinking-water
+* https://www.scientificamerican.com/article/climate-change-is-acidifying-and-contaminating-drinking-water-and-alpine-ecosystems/
+* https://www.watereducation.org/aquapedia-background/potable-water
+* https://www.epa.gov/ground-water-and-drinking-water/national-primary-drinking-water-regulations
+* https://developers.google.com/machine-learning/crash-course/classification/roc-and-auc
+* https://www.products.pcc.eu/en/blog/what-should-the-ph-of-drinking-water-be/
+
