@@ -1083,8 +1083,8 @@ library(plotly)
 rm(fig)
 fig <- plot_ly(x=water_quality_RF_error$`Number of Trees`, y=water_quality_RF_error$Diff,name="Diff", type = 'scatter', mode = 'lines')
 fig <- fig %>% add_trace(y=water_quality_RF_error$`Out of the Box`, name="OOB_Er")
-fig <- fig %>% add_trace(y=water_quality_RF_error$`Potable`, name="Potable")
 fig <- fig %>% add_trace(y=water_quality_RF_error$`Non_Potable`, name="Non_Potable")
+fig <- fig %>% add_trace(y=water_quality_RF_error$`Potable`, name="Potable")
 fig
 ```
 
