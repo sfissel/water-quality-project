@@ -17,13 +17,13 @@ library(e1071)
 library(tidyverse)
 library(plotly)
 library(htmltools)
-install.packages("devtools")
+#install.packages("devtools")
 library(devtools)
-install.packages("caret")
+#install.packages("caret")
 library(caret)
-install.packages("NbClust")
+#install.packages("NbClust")
 library(NbClust)
-install.packages("randomForest")
+#install.packages("randomForest")
 library(randomForest)
 library(rio)
 library(tidyverse)
@@ -41,7 +41,7 @@ str(water_quality)
 ```
 
 
-#Finish any other data prep (one-hot encode, reduce factor levels)
+#Data Prep
 ```{r}
 dim(water_quality) #10 columns, 3276 rows
 sum(is.na(water_quality)) #1434 missing values
@@ -74,7 +74,6 @@ water_quality$Potability <- recode(water_quality$Potability,
                            '0' = 'Non_Potable', 
                             '1' = 'Potable')
 ```
-
 
 #test, tune and training sets 
 ```{r}
@@ -109,7 +108,7 @@ dim(tune)
 ```
 
 
-#Calculate the initial mtry level 
+#Calculating initial mtry level 
 ```{r}
 water_quality_tune <- function(x){
   water_quality <- dim(x)[2]-1
@@ -120,7 +119,8 @@ water_quality_tune(water_quality)
 # = 3
 ```
 
-#Run the initial RF model with 1000 trees
+
+#Running initial RF model with 1000 trees
 ```{r}
 water_quality_RF = randomForest(as.factor(Potability)~.,          
                             train,     
@@ -128,7 +128,7 @@ water_quality_RF = randomForest(as.factor(Potability)~.,
                             mtry = 3, 
                             replace = TRUE,      
                             sampsize = 100,      
-                            nodesize = 4,        
+                            nodesize = 5,        
                             
                             importance = TRUE,   
                            
@@ -151,16 +151,14 @@ varImp(water_quality_RF)
 #Using the training and tune datasets to tune the model in consideration of the number of trees, the number of variables to sample and the sample size that optimize the model output.
 ```{r}
 #### Optimize the random forest model ####
-
 set.seed(1984)	
 water_quality_RF_2 = randomForest(as.factor(Potability)~.,          #<- 
                               train,    
-                              ntree = 1000,     
+                              ntree = 5000,     
                               mtry = 6,          
                               replace = TRUE,   
-                             
                               sampsize = 200,    
-                              nodesize = 10, 
+                              nodesize = 8, 
                               importance = TRUE,  
                               proximity = FALSE, 
                               norm.votes = TRUE, 
@@ -170,32 +168,76 @@ water_quality_RF_2 = randomForest(as.factor(Potability)~.,          #<-
 ```
 
 
-#evaluate the model using the test dataset. 
+#evaluate model using the test dataset. 
 ```{r}
 water_quality_predict = predict(water_quality_RF_2,      #<- a randomForest model
                             test,      #<- the test data set to use
                             type = "response",   #<- what results to produce, see the help menu for the options
                             predict.all = TRUE)
 
-
-
 str(water_quality_predict)
 
 water_quality_RF_2$confusion
-#            Non_Potable Potable class.error
-#Non_Potable         887      73  0.07604167
-#Potable             464     185  0.71494607
-
 water_quality_RF$confusion
-#            Non_Potable Potable class.error
-#Non_Potable         910      50  0.05208333
-#Potable             525     124  0.80893683
-
 
 library(caret)
 confusionMatrix(as.factor(water_quality_predict$aggregate),as.factor(test$Potability),positive = "Potable", 
                 dnn=c("Prediction", "Actual"), mode = "everything")
 ```
+
+
+#visualize the random forest/accuracy/error rate
+```{r}
+#calling up criteria for random forest:
+water_quality_RF$call
+
+water_quality_RF$confusion
+water_quality_acc = sum(water_quality_RF$confusion[row(water_quality_RF$confusion) == 
+                    col(water_quality_RF$confusion)]) /sum(water_quality_RF$confusion)
+
+#checking accuracy of model
+water_quality_acc
+
+#error rate
+View(as.data.frame(water_quality_RF$err.rate))
+
+err.rate <- as.data.frame(water_quality_RF$err.rate)
+
+View(err.rate)
+
+# The "oob.times" argument includes the number of times that each data point is not excluded from trees in the random forest.
+View(as.data.frame(water_quality_RF$oob.times))
+
+rf_density <- density(water_quality_RF$oob.times)
+plot(rf_density)
+```
+
+#visualize the plot
+```{r}
+water_quality_RF_error = data.frame(1:nrow(water_quality_RF$err.rate),
+                                water_quality_RF$err.rate)
+
+
+
+colnames(water_quality_RF_error) = c("Number of Trees", "Out of the Box",
+                                 "Potable", "Non_Potable")
+
+water_quality_RF_error$Diff <- water_quality_RF_error$Potable-water_quality_RF_error$`Non_Potable`
+
+View(water_quality_RF_error)
+
+
+library(plotly)
+
+rm(fig)
+fig <- plot_ly(x=water_quality_RF_error$`Number of Trees`, y=water_quality_RF_error$Diff,name="Diff", type = 'scatter', mode = 'lines')
+fig <- fig %>% add_trace(y=water_quality_RF_error$`Out of the Box`, name="OOB_Er")
+fig <- fig %>% add_trace(y=water_quality_RF_error$`Potable`, name="Potable")
+fig <- fig %>% add_trace(y=water_quality_RF_error$`Non_Potable`, name="Non_Potable")
+
+fig
+```
+
 
 
 ## R Markdown
