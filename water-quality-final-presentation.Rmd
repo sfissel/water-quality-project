@@ -914,6 +914,7 @@ shinyApp(
 ```
 
 ## Random Forest
+### Note: We were unable to determine why the plot was plotting the opposite error of potable and nonpotable. For the sake of presenting, we manually corrected labels and that image of the graph can be found on the website in the Random Forest Evaluation found in the Results section.
 
 #Load the Data
 ```{r}
@@ -1114,7 +1115,7 @@ str(water_quality)
 #glimpse(water_quality)
 ```
 
-### We had a weird issue that the values (potable and non_potable) of "Potability" variable was switched even though we labeled them correctly. So, it shows the swap between sensitivity and specificity. But, the correct value is potable = 1 and non_potable = 0.  
+### Note: We had a weird issue that the values (potable and non_potable) of "Potability" variable was switched even though we labeled them correctly. So, it shows the swap between sensitivity and specificity. But, the correct value is potable = 1 and non_potable = 0.  
 
 ### Splitting the data with tuning and test & Creating Decision Trees
 #### First Decision Tree Model
